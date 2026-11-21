@@ -1,0 +1,1282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Unjinxable</title>
+<meta name="description" content="The word game where saying the same thing as anyone else gets you jinxed. Play solo, take the daily, or make a room with friends.">
+<meta property="og:title" content="Unjinxable">
+<meta property="og:description" content="Say something nobody else will. Match anyone and you're jinxed.">
+<meta name="theme-color" content="#f3f1ec">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' rx='26' fill='%23cbeb00'/%3E%3Ccircle cx='61' cy='43' r='24.7' fill='%23afc800'/%3E%3Cpath d='M11,120 C13,90 34,71.5 61,71.5 C88,71.5 106,90 107.5,120Z' fill='%23afc800'/%3E%3C/svg%3E">
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+:root{--bg:#f3f1ec;--ink:#141414;--muted:#77736b;--line:#e4e1d8;--lime:#cbeb00;--pink:#ff4fa0;--red:#ff3b5c;--violet:#7d5ce6;
+  --font:"Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.45}
+main{max-width:960px;margin:0 auto;padding:22px 16px 48px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+.logo{font-weight:900;font-size:26px;letter-spacing:-.03em}
+.logo i,h1 i{font-style:normal;background:var(--lime);border-radius:9px;padding:0 7px;margin-left:2px}
+.stat{font-size:13px;font-weight:700;color:var(--muted)}
+.btn{font:inherit;font-weight:900;font-size:16px;border:0;border-radius:16px;padding:13px 24px;background:var(--ink);color:var(--lime);cursor:pointer}
+.btn:active{transform:translateY(1px)}
+.btn.ghost{background:#fff;color:var(--ink);box-shadow:inset 0 0 0 2px var(--line)}
+.btn:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.muted{color:var(--muted)}
+
+/* board */
+.board{display:grid;grid-template-columns:1fr auto;gap:12px}
+.cat{background:var(--ink);color:#fff;border-radius:22px;padding:16px 22px}
+.cat .k{font-size:12px;font-weight:800;letter-spacing:.16em;color:var(--lime)}
+.cat .v{font-size:38px;font-weight:900;letter-spacing:-.02em;line-height:1.1}
+.time{background:var(--pink);border-radius:22px;width:110px;display:grid;place-items:center;color:#fff;text-align:center;transition:background .2s}
+.time b{display:block;font-size:42px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+.time span{font-size:11px;font-weight:800;letter-spacing:.14em}
+.time.hot{background:var(--red);animation:pulse .5s infinite alternate}
+.time.done{background:var(--ink)}
+@keyframes pulse{to{transform:scale(1.04)}}
+.bar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:10px}
+.bar i{display:block;height:100%;background:var(--ink);transition:width .1s linear}
+.bar.hot i{background:var(--red)}
+
+@keyframes in{from{transform:translateY(6px);opacity:0}}
+
+/* players */
+.grid{margin-top:18px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media (max-width:640px){.grid{grid-template-columns:repeat(2,1fr)} .cat .v{font-size:26px} .time{width:84px} .time b{font-size:32px} h1{font-size:40px}}
+.p{background:#fff;border-radius:22px;padding:10px 10px 12px;text-align:center;position:relative;box-shadow:0 2px 0 rgba(0,0,0,.05);transition:opacity .3s}
+.p svg{display:block;width:100%;height:auto;border-radius:16px}
+.p.you{box-shadow:0 0 0 3px var(--ink)}
+.p.gone{opacity:.5}
+.p.shake{animation:shake .4s}
+@keyframes shake{20%{transform:translateX(-5px) rotate(-2deg)}40%{transform:translateX(5px) rotate(2deg)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+.nm{font-weight:800;margin-top:7px;font-size:15px}
+.chip{margin-top:6px;display:inline-block;max-width:100%;border-radius:99px;padding:4px 12px;font-weight:800;font-size:14px;color:#fff;background:var(--c);word-break:break-word}
+.chip.wait{background:#f0eee8;color:#aaa69c}
+.chip.lock{background:var(--ink);color:#fff}
+.chip.flip{animation:flip .3s ease-out}
+.chip.dead{background:#e9e7e1;color:#a5a29a;text-decoration:line-through;text-decoration-color:var(--red);text-decoration-thickness:2.5px}
+.chip.spared{background:#ffd23f;color:var(--ink)}
+@keyframes flip{from{transform:rotateX(90deg)}}
+.typing{letter-spacing:2px;animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.35}}
+.stamp{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) rotate(-12deg);font-weight:900;font-size:24px;color:#fff;background:var(--red);
+  border-radius:12px;padding:2px 12px 4px;box-shadow:0 6px 0 rgba(0,0,0,.12);white-space:nowrap;animation:stamp .35s cubic-bezier(.2,1.6,.4,1)}
+@keyframes stamp{from{transform:translate(-50%,-50%) rotate(-12deg) scale(2.2);opacity:0}}
+
+/* input + banners */
+.ask{margin-top:18px}
+.ask form{display:flex;gap:10px}
+.ask input{flex:1;min-width:0;font:inherit;font-size:20px;font-weight:600;padding:13px 18px;border-radius:18px;border:0;background:#fff;box-shadow:inset 0 0 0 2px var(--line);outline:none;color:var(--ink)}
+.ask input:focus{box-shadow:inset 0 0 0 2.5px var(--ink)}
+.msg{min-height:22px;margin-top:8px;font-weight:700;font-size:14px;padding-left:4px}
+.msg.bad{color:var(--red)} .msg.good{color:#14a06f}
+.used{margin-top:8px;font-size:13px;color:var(--muted);font-weight:600}
+.used span{display:inline-block;background:#fff;border-radius:99px;padding:2px 10px;margin:3px 4px 0 0;text-decoration:line-through;text-decoration-color:#c9c5bb}
+.banner{margin-top:18px;border-radius:22px;padding:16px 20px;background:#fff;box-shadow:0 2px 0 rgba(0,0,0,.05);animation:in .25s ease-out}
+.banner.red{background:var(--red);color:#fff}
+.banner.lime{background:var(--lime)}
+.banner.ink{background:var(--ink);color:#fff}
+.banner .h{font-size:28px;font-weight:900;letter-spacing:-.02em;line-height:1.1}
+.banner .lines{margin:8px 0 14px;display:grid;gap:3px;font-weight:600}
+.banner.red .btn,.banner.ink .btn{background:#fff;color:var(--ink)}
+.banner.red .btn.ghost,.banner.ink .btn.ghost{background:transparent;color:#fff;box-shadow:inset 0 0 0 2px rgba(255,255,255,.5)}
+
+/* title + end */
+.panel{background:#fff;border-radius:26px;padding:26px;box-shadow:0 2px 0 rgba(0,0,0,.05)}
+h1{font-size:56px;line-height:1.08;letter-spacing:-.04em;margin:0 0 12px}
+h1 i{display:inline-block;border-radius:14px;padding:0 12px 4px;margin:6px 0 0}
+.lead{font-size:18px;font-weight:600;color:var(--muted);margin:0}
+.lineup{display:flex;gap:8px;margin:18px 0 6px;flex-wrap:wrap}
+.lineup svg{width:50px;border-radius:15px}
+.steps{list-style:none;padding:0;margin:18px 0;display:grid;gap:10px;counter-reset:s}
+.steps li{counter-increment:s;background:var(--bg);border-radius:16px;padding:12px 14px 12px 52px;position:relative;font-weight:500}
+.steps li::before{content:counter(s);position:absolute;left:14px;top:11px;width:26px;height:26px;border-radius:9px;background:var(--ink);color:var(--lime);font-weight:900;display:grid;place-items:center;font-size:14px}
+.recap{display:grid;gap:6px;margin:14px 0}
+.recap div{background:var(--bg);border-radius:12px;padding:8px 14px;display:flex;justify-content:space-between;gap:10px;font-weight:600}
+.share{white-space:pre;font-family:ui-monospace,Consolas,monospace;background:var(--bg);border-radius:12px;padding:10px 14px;display:inline-block;margin:4px 0 16px;font-size:14px}
+.big{font-size:44px;font-weight:900;letter-spacing:-.03em;line-height:1;margin:0 0 6px}
+.foot{margin-top:16px;font-size:13px;color:var(--muted);text-align:center;font-weight:600}
+
+/* ---- compact layout: everything fits on one screen ---- */
+main{padding-top:16px}
+.top{margin-bottom:12px}
+.cat{padding:12px 18px;border-radius:18px}
+.cat .v{font-size:30px}
+.time{width:92px;border-radius:18px}
+.time b{font-size:34px}
+.bar{margin-top:8px}
+.ask{margin-top:12px}
+.ask input{font-size:19px;padding:11px 16px}
+.msg{margin-top:6px;min-height:20px}
+.banner{margin-top:12px;padding:12px 16px;border-radius:18px}
+.banner .h{font-size:22px}
+.banner .lines{margin:6px 0 10px;font-size:14px}
+.banner .btn{padding:10px 18px;font-size:15px}
+.grid{margin-top:12px;grid-template-columns:repeat(8,1fr);gap:8px}
+.p{padding:6px 6px 8px;border-radius:16px}
+.p svg{border-radius:11px}
+.p.you{box-shadow:0 0 0 2.5px var(--ink)}
+.nm{font-size:13px;margin-top:4px;line-height:1.2}
+.chip{font-size:12px;padding:2px 8px;margin-top:4px;line-height:1.35}
+.stamp{font-size:13px;padding:1px 7px 2px;border-radius:7px;top:34%;box-shadow:0 3px 0 rgba(0,0,0,.12)}
+.panel .recap div{padding:6px 12px}
+.big{font-size:34px}
+@media (max-width:640px){.grid{grid-template-columns:repeat(4,1fr)} .cat .v{font-size:23px} .time{width:76px} .time b{font-size:28px}}
+
+.top .right{display:flex;align-items:center;gap:12px}
+.snd{font:inherit;border:0;background:#fff;border-radius:12px;width:38px;height:38px;cursor:pointer;font-size:17px;box-shadow:0 2px 0 rgba(0,0,0,.05)}
+.pick{font-weight:800;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:4px 0 8px}
+.themes{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.th{font:inherit;font-weight:700;font-size:14px;border:0;border-radius:99px;padding:8px 14px;background:var(--bg);color:var(--ink);cursor:pointer}
+.th:hover{box-shadow:inset 0 0 0 2px var(--ink)}
+.th.on{background:var(--ink);color:var(--lime)}
+
+/* ---- home, rooms, chat, solo ---- */
+#wrap{max-width:960px;margin:0 auto;padding:16px 16px 40px}
+body.chat-on #wrap{max-width:1280px;display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:18px;align-items:start}
+#side{display:none}
+body.chat-on #side{display:block;position:sticky;top:16px}
+@media (max-width:900px){body.chat-on #wrap{grid-template-columns:1fr} body.chat-on #side{position:static}}
+a.logo{color:inherit;text-decoration:none}
+.hero{margin:10px 0 4px}
+.hero h1{font-size:52px}
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}
+@media (max-width:760px){.modes{grid-template-columns:1fr}}
+.mode{font:inherit;text-align:left;border:0;border-radius:22px;padding:18px;cursor:pointer;color:var(--ink);background:#fff;box-shadow:0 2px 0 rgba(0,0,0,.05);display:flex;flex-direction:column;gap:6px;min-height:190px;transition:transform .12s}
+.mode:hover{transform:translateY(-3px)}
+.mode .mi{font-size:30px}
+.mode .mt{font-size:22px;font-weight:900;letter-spacing:-.02em}
+.mode .md{font-size:14px;font-weight:500;color:var(--muted)}
+.mode .ms{margin-top:auto;font-size:12.5px;font-weight:800}
+.mode.lobby{background:var(--ink);color:#fff} .mode.lobby .md{color:#b9b9b9} .mode.lobby .ms{color:var(--lime)}
+.mode.daily{background:var(--lime)} .mode.daily .md{color:#4b5300}
+details.how{background:#fff;border-radius:18px;padding:12px 18px;box-shadow:0 2px 0 rgba(0,0,0,.05)}
+details.how summary{font-weight:800;cursor:pointer}
+details.how .steps{margin:12px 0 4px}
+.h2{font-size:26px;letter-spacing:-.02em;margin:0 0 10px}
+.roomhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.code{font-size:36px;font-weight:900;letter-spacing:.14em;line-height:1}
+.roster{display:flex;gap:10px;flex-wrap:wrap;margin:4px 0 16px}
+.roster > div{text-align:center;font-size:12px;font-weight:700;width:60px;animation:in .25s ease-out}
+.roster svg{width:54px;border-radius:15px;display:block;margin:0 auto 3px}
+.roster .empty{display:block;width:54px;height:54px;border-radius:15px;border:2px dashed var(--line);margin:0 auto 3px}
+.note{font-size:13px;color:var(--muted);margin:14px 0 0;font-weight:600}
+.auto{font-weight:700;opacity:.8;font-size:14px}
+.chat{background:#fff;border-radius:22px;box-shadow:0 2px 0 rgba(0,0,0,.05);display:flex;flex-direction:column;height:calc(100vh - 32px);max-height:700px;min-height:380px;overflow:hidden}
+.chead{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 8px;font-size:15px}
+.chead span{font-size:12px;font-weight:700;color:var(--muted)}
+.watch{padding:0 14px 8px;display:flex;flex-wrap:wrap;gap:5px;font-size:12px;font-weight:700;color:var(--muted);align-items:center}
+.watch:empty{display:none}
+.watch span{background:var(--bg);border-radius:99px;padding:2px 9px}
+.feed{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:7px;border-top:2px solid var(--bg)}
+.m{font-size:14px;line-height:1.35;word-wrap:break-word;animation:in .2s ease-out}
+.m.sys{color:var(--muted);font-size:12.5px;font-weight:600;text-align:center;background:var(--bg);border-radius:10px;padding:4px 8px}
+#cform{display:flex;gap:6px;padding:10px;border-top:2px solid var(--bg)}
+#cin{flex:1;min-width:0;font:inherit;font-size:14px;border:0;background:var(--bg);border-radius:12px;padding:9px 12px;outline:none;color:var(--ink)}
+#cin:focus{box-shadow:inset 0 0 0 2px var(--ink)}
+#cform button{font:inherit;font-weight:800;border:0;border-radius:12px;background:var(--ink);color:var(--lime);padding:0 14px;cursor:pointer}
+.solowrap{margin-top:12px;display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:stretch}
+.crowd{background:#fff;border-radius:16px;padding:12px 14px;box-shadow:0 2px 0 rgba(0,0,0,.05)}
+.crowd .ch{font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--muted);margin-bottom:8px;text-transform:uppercase}
+.slots{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.slot{background:var(--bg);border-radius:10px;padding:7px 10px;font-weight:800;font-size:14px;color:#b9b5ab;display:flex;gap:8px;align-items:center;min-height:36px}
+.slot span{font-size:11px;color:#c9c5bb}
+.slot.open{background:var(--ink);color:#fff;animation:flip .3s ease-out}
+.slot.open span{color:var(--lime)}
+.slot.hit{background:var(--red)}
+.slot.hit span{color:#fff}
+@media (max-width:640px){.slots{grid-template-columns:repeat(2,1fr)} .solowrap{grid-template-columns:96px 1fr} .hero h1{font-size:40px}}
+
+/* ---- online rooms ---- */
+.notice{background:#fff3cd;border-radius:14px;padding:10px 16px;font-weight:700;margin-bottom:10px}
+.lbl{display:block;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:6px 0 6px}
+.field{font:inherit;font-size:18px;font-weight:700;padding:11px 14px;border-radius:14px;border:0;background:var(--bg);color:var(--ink);outline:none;width:100%;max-width:360px}
+.field:focus{box-shadow:inset 0 0 0 2.5px var(--ink)}
+.codein{max-width:150px;text-transform:uppercase;letter-spacing:.2em;text-align:center}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+@media (max-width:700px){.two{grid-template-columns:1fr}}
+.box{background:var(--bg);border-radius:18px;padding:16px}
+.box h3{margin:0 0 2px;font-size:19px}
+.box p{margin:0 0 12px;font-size:14px}
+.box .field{background:#fff}
+.netstat{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin-top:6px}
+.netstat.on{color:#14a06f}
+.netstat.off{color:var(--red)}
+.invite{background:var(--bg);border-radius:12px;padding:10px 14px;font-weight:600;margin:0 0 16px}
+.roster small{display:block;font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.btn.sm{padding:8px 14px;font-size:14px;border-radius:12px}
+.themename{font-weight:800;margin:0 0 16px}
+.m.mine b::after{content:" (you)";font-weight:600;color:var(--muted)}
+
+.msg.warn{color:#a76f00}
+.ask .row .msg{flex:1}
+.votes{display:grid;gap:8px;margin-top:10px}
+.vrow{background:var(--bg);border-radius:14px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.vbtn{font:inherit;font-weight:800;font-size:14px;border:0;border-radius:12px;padding:8px 12px;background:#fff;cursor:pointer;box-shadow:inset 0 0 0 2px var(--line);color:var(--ink)}
+.vbtn:hover{box-shadow:inset 0 0 0 2px var(--ink)}
+.vbtn.on{background:var(--ink);color:var(--lime);box-shadow:none}
+.vbtn.no.on{background:var(--red);color:#fff}
+</style>
+</head>
+<body>
+<main id="wrap"><div id="app"></div><aside id="side"></aside></main>
+<script>
+/* ===================== helpers ===================== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* ===================== content =====================
+   Each list is ordered roughly from most common answer to least common.
+   "a|b|c" = the same answer spelled different ways (first one is shown). */
+const CATS = {
+  food: { title: 'Food', list: `pizza, burger|hamburger|cheeseburger, pasta, sushi, tacos|taco, ice cream, chicken, rice, apple, banana, bread, cheese, chocolate, steak, salad, fries|french fries, eggs|egg, soup, sandwich, cake, spaghetti, orange, strawberry, potato, bacon, cookie|cookies, hot dog, noodles, pancakes|pancake, donut|doughnut, burrito, carrot, grapes|grape, watermelon, broccoli, popcorn, cereal, yogurt|yoghurt, tomato, mango, pie, lasagna, waffle|waffles, shrimp, salmon, avocado, peanut butter, corn, curry, dumplings|dumpling, ramen, mac and cheese|macaroni and cheese|mac n cheese, nachos, beans, oatmeal, pineapple, lemon, mushroom|mushrooms, onion, peach, cherry, kiwi, spinach, bagel, croissant, tofu, lobster, cucumber, pear, blueberry|blueberries, ham, sausage, honey, pretzel, muffin, brownie, quesadilla, pho, kimchi, falafel, hummus, risotto, paella, gnocchi, ravioli, meatballs|meatball, coconut, plum, lime, lettuce, pumpkin, zucchini, eggplant, cabbage, cauliflower, peas, lentils, granola, tuna, crab, oysters|oyster, turkey, lamb, ribs, chicken wings|wings, jerky, pad thai, fried rice, enchiladas|enchilada, tamales|tamale, gyro, kebab, samosa, biryani, churros|churro, cheesecake, pudding, jello, toast, butter, olives|olive, pickles|pickle, celery, asparagus, garlic, chili, bibimbap, shakshuka, ceviche, poutine, pierogi` },
+  fruit: { title: 'Fruit', list: `apple, banana, orange, strawberry, grapes|grape, watermelon, mango, pineapple, cherry|cherries, peach, blueberry|blueberries, kiwi, pear, lemon, raspberry|raspberries, lime, coconut, plum, grapefruit, cantaloupe, papaya, pomegranate, apricot, blackberry|blackberries, fig, dragon fruit|dragonfruit|pitaya, passion fruit, lychee|litchi, cranberry|cranberries, honeydew, nectarine, tangerine, clementine, guava, avocado, tomato, dates|date, persimmon, starfruit|star fruit, durian, jackfruit, mulberry, gooseberry, kumquat, quince, plantain, mandarin, boysenberry, elderberry, rambutan, olive, tamarind, mangosteen, loquat, ugli fruit, pawpaw` },
+  pizza: { title: 'Pizza toppings', list: `pepperoni, cheese|extra cheese, mushrooms|mushroom, sausage, pineapple, olives|olive|black olives, onions|onion, ham, bacon, peppers|green peppers|bell peppers, jalapenos|jalapeno, spinach, chicken, tomatoes|tomato, basil, anchovies|anchovy, garlic, beef|ground beef, salami, artichoke|artichokes, arugula, mozzarella, feta, corn, pesto, prosciutto, ricotta, egg, shrimp, broccoli, meatballs|meatball, eggplant, zucchini, chorizo, parmesan, sun dried tomatoes, truffle, hot honey, red onion, goat cheese, potato, kale, banana peppers, buffalo chicken, bbq chicken, canadian bacon, italian sausage, green olives, pickles, tomato sauce|marinara|sauce|pizza sauce, alfredo|white sauce, garlic butter, oregano, red pepper flakes|chili flakes, cheddar, provolone, sardines, tuna, crab, steak, pulled pork, brisket, ranch, capers, figs, pear, roasted garlic, cherry tomatoes, tater tots, mac and cheese, hot dog, eggplant parm, pesto chicken, gorgonzola, burrata, honey, hot sauce, sriracha, ham and pineapple|hawaiian` },
+  icecream: { title: 'Ice cream flavors', list: `vanilla, chocolate, strawberry, mint chocolate chip|mint chip|mint, cookie dough, cookies and cream|cookies n cream, rocky road, pistachio, butter pecan, neapolitan, coffee, salted caramel, chocolate chip, caramel, peanut butter, birthday cake, mango, coconut, cherry, matcha|green tea, rum raisin, black cherry, moose tracks, lemon, raspberry, banana, cookie butter, ube, dulce de leche, cotton candy, bubblegum|bubble gum, pumpkin, peach, hazelnut, smores|s'mores, tiramisu, cinnamon, maple walnut, lavender, honeycomb` },
+  pasta: { title: 'Pasta shapes', list: `spaghetti, penne, macaroni, fettuccine|fettucine, lasagna|lasagne, linguine, ravioli, rigatoni, fusilli, farfalle|bow tie|bowtie|bow ties, tortellini, angel hair|capellini, rotini, orzo, ziti, shells|shell|conchiglie, gnocchi, bucatini, orecchiette, pappardelle, tagliatelle, cannelloni, manicotti, vermicelli, ditalini, gemelli, radiatori, cavatappi, campanelle, paccheri` },
+  hotdog: { title: 'Hot dog toppings', list: `ketchup, mustard, relish, onions|onion, chili, cheese, sauerkraut, mayo|mayonnaise, jalapenos|jalapeno, bacon, pickles|pickle, coleslaw|slaw, tomato|tomatoes, sriracha, bbq sauce|barbecue sauce, peppers, guacamole|guac, salsa, hot sauce, celery salt, avocado, kimchi, pineapple, fries` },
+  animals: { title: 'Animals', list: `dog, cat, lion, elephant, tiger, horse, monkey, giraffe, bear, cow, pig, rabbit|bunny, snake, dolphin, shark, wolf, fox, zebra, penguin, chicken, mouse, bird, fish, owl, eagle, panda, koala, kangaroo, deer, sheep, goat, duck, frog, turtle, whale, octopus, gorilla, cheetah, leopard, hippo|hippopotamus, rhino|rhinoceros, camel, squirrel, raccoon, sloth, otter, crocodile, alligator, lizard, hamster, parrot, flamingo, peacock, bat, spider, bee, butterfly, ant, jellyfish, seal, polar bear, moose, llama, alpaca, hedgehog, skunk, beaver, badger, porcupine, platypus, armadillo, chameleon, iguana, crab, lobster, starfish|sea star, seahorse, swan, goose, pelican, toucan, hummingbird, crow, raven, pigeon, hyena, jaguar, panther, lynx, bison|buffalo, yak, ostrich, emu, walrus, narwhal, axolotl, capybara, meerkat, lemur, orangutan, chimpanzee|chimp, mole, ferret, donkey, mule, worm, snail, slug, scorpion, mosquito, ladybug, dragonfly, grasshopper, cricket, manatee, stingray, eel, squid, tortoise, gecko, pufferfish, salamander, newt, opossum|possum, coyote, wombat, tapir, okapi, pangolin, aardvark, gazelle, antelope, elk, reindeer|caribou` },
+  sports: { title: 'Sports', list: `soccer, basketball, football|american football, baseball, tennis, golf, hockey|ice hockey, volleyball, swimming, boxing, running|track, cricket, rugby, badminton, table tennis|ping pong, skiing, snowboarding, surfing, skateboarding, wrestling, gymnastics, cycling|biking, bowling, lacrosse, softball, archery, fencing, rowing, karate, judo, mma, polo, water polo, curling, handball, pickleball, squash, rock climbing|climbing, diving, sailing, darts, figure skating, bobsled, triathlon, equestrian|horse riding, dodgeball, ultimate frisbee|frisbee, kickball, billiards|pool, kayaking, motocross, car racing|racing|nascar, sumo, taekwondo, kickboxing, parkour, field hockey` },
+  beach: { title: 'Things at the beach', list: `sand, sun, ocean|sea|water, waves|wave, towel|beach towel, umbrella|beach umbrella, sunscreen, seashells|shells|shell|seashell, sunglasses, seagull|seagulls|gull, sandcastle|sand castle, crab, bucket, shovel|spade, surfboard, swimsuit|bathing suit, lifeguard, beach ball, cooler, boat, beach chair|chair, flip flops|sandals, palm tree, starfish, kite, volleyball, seaweed, jellyfish, fish, pier, dock, sun hat|hat, rocks|rock, pebbles, dolphin, shark, snorkel, boogie board, frisbee, ice cream, lighthouse, tide, sand dunes|dunes, driftwood, bikini, sunburn, picnic, speaker|radio, book, sailboat, jet ski, paddleboard|paddle board, tan lines` },
+  dogs: { title: 'Dog breeds', list: `golden retriever, labrador|lab|labrador retriever, german shepherd, poodle, bulldog, beagle, chihuahua, husky|siberian husky, pug, dachshund|wiener dog, corgi, rottweiler, boxer, pitbull|pit bull, shih tzu, yorkie|yorkshire terrier, border collie, great dane, doberman, french bulldog|frenchie, dalmatian, pomeranian, maltese, cocker spaniel, shiba inu|shiba, saint bernard|st bernard, bernese mountain dog, australian shepherd|aussie, greyhound, collie, boston terrier, schnauzer, bloodhound, akita, samoyed, mastiff, newfoundland, basset hound, jack russell|jack russell terrier, labradoodle, goldendoodle, whippet, weimaraner, vizsla, cavalier king charles spaniel|cavalier, malamute|alaskan malamute, chow chow|chow, papillon, havanese, bichon frise|bichon, pekingese, sheltie|shetland sheepdog, irish setter, westie|west highland terrier, cane corso, great pyrenees, borzoi, afghan hound, bull terrier` },
+  yellow: { title: 'Things that are yellow', list: `banana, sun, lemon, school bus|bus, corn, taxi|cab|taxi cab, cheese, sunflower, rubber duck|duck, butter, pineapple, egg yolk|yolk, mustard, bee, pencil, canary, star, smiley face|smiley, highlighter, tennis ball, gold, sand, chick|baby chick, daffodil, lemonade, minion|minions, pikachu, spongebob, caution sign|warning sign, honey, popcorn, hard hat, raincoat, dandelion, giraffe, post it|sticky note, mango, caution tape` },
+  space: { title: 'Things in space', list: `sun, moon, mars, earth, jupiter, saturn, stars|star, venus, mercury, neptune, uranus, pluto, comet, asteroid, black hole, galaxy, meteor, satellite, rocket, astronaut, milky way, nebula, aliens|alien, ufo, space station|iss, telescope, constellation, supernova, meteorite, big dipper, orion, dwarf planet, solar system, wormhole, space junk, quasar` },
+  house: { title: 'Things in a house', list: `bed, couch|sofa, table, chair, tv|television, lamp, fridge|refrigerator, door, window, oven, stove, toilet, sink, shower, bathtub|tub, mirror, rug|carpet, pillow, blanket, microwave, closet, dresser, desk, bookshelf|bookcase, clock, curtains|curtain, plant, painting, stairs, fireplace, dishwasher, washing machine|washer, dryer, vacuum, toaster, kettle, mug|cup, plate, fork, spoon, knife, pan, pot, towel, toothbrush, laptop|computer, phone, light bulb|light, fan, cabinet, drawer, shelf, picture frame, candle, vase, book|books, remote, speaker, router, doorbell, broom, mop, trash can|garbage can|bin, iron, hamper, alarm clock, coat rack, doormat, smoke detector|smoke alarm, thermostat, outlet, ceiling fan, nightstand, ottoman` },
+  jobs: { title: 'Jobs', list: `doctor, teacher, nurse, lawyer, firefighter|fireman, police officer|cop|policeman, chef|cook, engineer, pilot, dentist, farmer, artist, scientist, programmer|software engineer|developer|coder, actor|actress, musician, accountant, mechanic, plumber, electrician, carpenter, writer|author, journalist, photographer, architect, vet|veterinarian, pharmacist, cashier, waiter|waitress|server, barista, baker, butcher, astronaut, soldier, judge, librarian, banker, designer, singer, dancer, athlete, janitor, mail carrier|mailman|postman, truck driver, taxi driver, bus driver, hairdresser|hairstylist|barber, therapist, psychologist, surgeon, professor, cleaner|maid, lifeguard, security guard, secretary, receptionist, manager, ceo, salesperson|salesman, realtor|real estate agent, model, influencer|youtuber|streamer, tattoo artist, florist, tailor, zookeeper, gardener|landscaper, construction worker, paramedic|emt, translator, detective, spy, clown, magician, dj, priest|pastor, politician, flight attendant, stockbroker, data scientist, economist, comedian` },
+  instruments: { title: 'Musical instruments', list: `guitar, piano, drums|drum, violin, flute, trumpet, saxophone|sax, bass|bass guitar, cello, clarinet, harp, ukulele|uke, trombone, harmonica, tuba, keyboard, banjo, accordion, xylophone, triangle, tambourine, oboe, viola, french horn|horn, bagpipes, recorder, mandolin, bongos, organ, synthesizer|synth, cymbals, sitar, didgeridoo, kazoo, bassoon, marimba, glockenspiel, maracas, cowbell, theremin, lute, steel drum|steel drums, double bass|upright bass, piccolo` },
+  trip: { title: 'Things you pack for a trip', list: `clothes, phone, charger|phone charger, toothbrush, passport, suitcase|luggage, wallet, sunglasses, camera, money|cash, snacks, headphones|earbuds, book, toothpaste, shoes, jacket, sunscreen, pillow|neck pillow, backpack, water bottle|water, laptop, keys, medicine, swimsuit, umbrella, hat, socks, underwear, pajamas, id|drivers license, credit card, tickets|ticket, map, toiletries, deodorant, shampoo, razor, adapter|plug adapter, journal, guidebook, tent, sleeping bag, flashlight, first aid kit, gum, kindle|e reader, makeup, hairbrush, contacts|glasses` },
+  colors: { title: 'Colors', list: `red, blue, green, yellow, purple, orange, pink, black, white, brown, gray|grey, teal, turquoise, magenta, cyan, maroon, navy|navy blue, beige, gold, silver, lavender, violet, indigo, lime|lime green, olive, coral, peach, mint, burgundy, tan, crimson, cream, ivory, salmon, mustard, aqua, fuchsia, periwinkle, charcoal, khaki, sky blue, chartreuse, mauve, scarlet, emerald, ruby, amber, rose` },
+  bathroom: { title: 'Things in a bathroom', list: `toilet, sink, shower, bathtub|tub, mirror, towel, toothbrush, toothpaste, soap, shampoo, toilet paper, conditioner, hairbrush|brush, comb, razor, floss, mouthwash, bath mat|mat, plunger, scale, hair dryer|blow dryer, rubber duck, sponge|loofah, lotion, deodorant, cotton swabs|q tips|qtips, shower curtain, medicine cabinet, makeup, perfume|cologne, nail clippers, tweezers, trash can, candle, bath bomb, towel rack, toilet brush, tissues|tissue, bubble bath, body wash` },
+};
+const LADDERS = [
+  { name: 'Snack Attack', emoji: '🍕', rounds: ['food', 'fruit', 'pizza', 'icecream', 'pasta', 'hotdog'] },
+  { name: 'Wild Planet', emoji: '🦒', rounds: ['animals', 'sports', 'beach', 'dogs', 'yellow', 'space'] },
+  { name: 'Around the House', emoji: '🏠', rounds: ['house', 'jobs', 'instruments', 'trip', 'colors', 'bathroom'] },
+];
+const TIMES = [15, 14, 13, 12, 11, 10];
+
+/* ===================== matching ===================== */
+function norm(s) {
+  return s.toLowerCase().replace(/&/g, ' and ').replace(/[-_/]/g, ' ').replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim()
+    .replace(/^(a|an|the|some)\s+/, '');
+}
+function stem(w) {
+  if (w.length > 4 && w.endsWith('ies')) return w.slice(0, -3) + 'y';
+  if (w.length > 4 && /(ches|shes|sses|xes|oes)$/.test(w)) return w.slice(0, -2);
+  if (w.length > 3 && w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1);
+  return w;
+}
+const key = s => norm(s).split(' ').map(stem).join('').replace(/\s/g, ''); // spaces ignored: "sand castle" = "sandcastle"
+function lev(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 9;
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[a.length][b.length];
+}
+// ---- more themes (each list ordered roughly most-common first) ----
+Object.assign(CATS, {
+  // Night Out
+  drinks: { title: 'Drinks', list: `water, coffee, tea, soda|pop|soft drink, juice, milk, beer, wine, lemonade, hot chocolate|hot cocoa, smoothie, milkshake, coke|cola|coca cola, iced tea, espresso, latte, cappuccino, energy drink|red bull, champagne, vodka, whiskey|whisky, tequila, rum, gin, sake, cider, kombucha, boba|bubble tea, matcha, chai, sparkling water|seltzer, root beer, ginger ale, sangria, margarita, mojito, martini, eggnog, horchata, coconut water, gatorade|sports drink, apple juice, cranberry juice, chocolate milk, frappuccino, mimosa, punch, protein shake, slushie, prosecco, mezcal, bourbon, brandy, cold brew, americano, mocha` },
+  bar: { title: 'Things at a bar', list: `beer, bartender, drinks, glasses|glass, bar stool|stools|stool, ice, beer tap|tap, wine, shots|shot, pool table, jukebox, tv, napkins|napkin, peanuts, bottles|bottle, tip jar, menu, darts|dartboard, music, cocktails, limes|lime, straws|straw, coasters|coaster, bouncer, mirror, neon sign, karaoke, bar tab|tab, cash, ice bucket, cocktail shaker|shaker, olives|olive, cherries|cherry, crowd|people, friends, fries, wings, happy hour, trivia, bathroom|restroom, stage, dj, pretzels, bottle opener` },
+  latenight: { title: 'Late-night snacks', list: `pizza, chips, ice cream, cereal, popcorn, ramen|instant noodles|cup noodles, cookies|cookie, fries, tacos|taco, burger, nachos, grilled cheese, quesadilla, chicken nuggets|nuggets, mac and cheese|mac n cheese, hot pockets|hot pocket, leftovers, toast, sandwich, candy, chocolate, pretzels, peanut butter, pbj|pb and j|peanut butter and jelly, burrito, waffles|waffle, pancakes, cheese, crackers, donut|doughnut, pop tarts|poptarts, gummy bears|gummies, cookie dough, fried rice, wings, hot dog, kebab|doner, egg rolls|egg roll, mozzarella sticks, pickles, fruit, yogurt, oreos|oreo, goldfish, trail mix, jerky|beef jerky, cheesecake, brownie, cheese fries` },
+  bag: { title: 'Things in a purse or bag', list: `wallet, phone, keys, lipstick, sunglasses, gum, hand sanitizer|sanitizer, tissues|tissue, charger, headphones|earbuds|airpods, chapstick|lip balm, mirror, makeup, receipts|receipt, pen, hair tie|hair ties|scrunchie, snacks, water bottle, perfume, hand cream|lotion, mints, umbrella, id, cash, credit card, notebook, book, glasses, sunscreen, band aids|bandaid, tampons|pads, painkillers|advil|ibuprofen|tylenol, coins, comb|brush, bobby pins, nail file, deodorant, face mask|mask, planner, laptop, power bank|portable charger, lighter, claw clip|hair clip, cardigan|sweater` },
+  concert: { title: 'Things at a concert', list: `music, band, singer, stage, crowd|fans, lights, speakers|speaker, guitar, drums, microphone|mic, tickets|ticket, merch|t shirt|tshirt, phones|phone, security, beer, drinks, earplugs, glow sticks|glowstick, encore, mosh pit, bouncer, screens|screen, confetti, fog machine|smoke|fog, fireworks|pyrotechnics, setlist, opening act|opener, backstage, wristband, posters|poster, bass, keyboard, dancing, screaming, lighters|lighter, signs|sign, cameras|camera, food truck|food, water, porta potty|port a potty|toilets, parking, barricade` },
+  cocktails: { title: 'Cocktails', list: `margarita, mojito, martini, cosmopolitan|cosmo, pina colada, old fashioned, daiquiri, mimosa, bloody mary, long island iced tea|long island, manhattan, negroni, moscow mule, whiskey sour, aperol spritz|spritz, sangria, espresso martini, mai tai, tequila sunrise, sex on the beach, white russian, gin and tonic, rum and coke|cuba libre, paloma, sidecar, tom collins, mint julep, bellini, caipirinha, dark and stormy, french 75, gimlet, screwdriver, lemon drop, blue lagoon, hurricane, irish coffee, pisco sour, sazerac, zombie, kamikaze` },
+  // Around the World
+  countries: { title: 'Countries', list: `usa|united states|america|us|united states of america, canada, mexico, china, japan, france, italy, germany, brazil, england|uk|united kingdom|great britain|britain, spain, australia, india, russia, south korea|korea, egypt, argentina, greece, ireland, sweden, norway, netherlands|holland, portugal, switzerland, thailand, vietnam, philippines, nigeria, south africa, kenya, turkey|turkiye, colombia, peru, chile, cuba, jamaica, new zealand, poland, belgium, denmark, finland, iceland, austria, israel, iran, iraq, pakistan, indonesia, malaysia, singapore, saudi arabia, morocco, ethiopia, ghana, ukraine, scotland, wales, czech republic|czechia, hungary, croatia, venezuela, ecuador, bolivia, uruguay, paraguay, nepal, mongolia, north korea, taiwan, bangladesh, sri lanka, haiti, dominican republic, costa rica, panama, honduras, guatemala, el salvador, nicaragua, qatar, uae|united arab emirates, lebanon, jordan, syria, afghanistan, madagascar, tanzania, uganda, senegal, zimbabwe, fiji, monaco, luxembourg, vatican city|vatican, liechtenstein, estonia, latvia, lithuania, romania, bulgaria, serbia, slovakia, slovenia, albania, cyprus, malta` },
+  cities: { title: 'Cities', list: `new york|nyc|new york city, london, paris, tokyo, los angeles|la, chicago, rome, dubai, miami, las vegas|vegas, sydney, berlin, toronto, barcelona, madrid, hong kong, san francisco|sf, seoul, beijing, shanghai, moscow, amsterdam, mumbai, istanbul, rio de janeiro|rio, mexico city, boston, seattle, houston, atlanta, dallas, austin, nashville, new orleans, philadelphia|philly, washington dc|dc, denver, vancouver, montreal, venice, florence, milan, athens, cairo, bangkok, lisbon, dublin, prague, vienna, budapest, copenhagen, stockholm, oslo, helsinki, edinburgh, manchester, liverpool, munich, zurich, geneva, brussels, cape town, nairobi, lagos, buenos aires, lima, bogota, havana, kyoto, osaka, delhi|new delhi, honolulu, orlando, phoenix, san diego, portland, detroit, minneapolis, melbourne, auckland, marrakech, jerusalem, tel aviv, doha` },
+  airport: { title: 'Things at an airport', list: `suitcase|luggage, plane|airplane, passport, security, gate, pilot, flight attendant, boarding pass, tickets|ticket, baggage claim, conveyor belt, x ray|scanner, metal detector, tsa, runway, control tower, terminal, coffee, duty free, food court|restaurants, bathrooms|bathroom, seats|chairs, departures board|screens, announcements, delays|delay, wheelchair, stroller, escalator, moving walkway, lounge, customs, immigration, travelers|people, luggage cart|carts, shuttle bus|shuttle, taxi, neck pillow, magazines|magazine, souvenirs, outlets|charging station, window, jet bridge, fuel truck, baggage handler, gift shop` },
+  languages: { title: 'Languages', list: `english, spanish, french, chinese|mandarin, german, japanese, italian, portuguese, russian, arabic, korean, hindi, dutch, swedish, greek, hebrew, turkish, polish, vietnamese, thai, latin, cantonese, tagalog|filipino, swahili, norwegian, danish, finnish, irish|gaelic, welsh, persian|farsi, urdu, bengali, punjabi, tamil, indonesian, malay, ukrainian, czech, hungarian, romanian, sign language|asl, esperanto, klingon, elvish, icelandic, yiddish, zulu, haitian creole|creole, navajo, hawaiian, sanskrit` },
+  islands: { title: 'Islands', list: `hawaii, bali, jamaica, iceland, cuba, puerto rico, maui, greenland, madagascar, sicily, bahamas, maldives, fiji, tahiti, bora bora, santorini, mykonos, ibiza, mallorca|majorca, sardinia, crete, bermuda, aruba, barbados, galapagos, easter island, manhattan, long island, marthas vineyard, nantucket, key west, oahu, kauai, phuket, sri lanka, tasmania, borneo, sumatra, java, capri, corsica, malta, cyprus, taiwan, zanzibar, saint lucia|st lucia, trinidad, cayman islands|caymans, turks and caicos, alcatraz, ellis island, staten island, coney island, guam` },
+  currencies: { title: 'Currencies', list: `dollar|us dollar|usd, euro, pound|british pound|sterling, yen, peso, rupee, yuan|renminbi|rmb, franc|swiss franc, ruble|rouble, won, real, bitcoin, rand, krona|krone, lira, dirham, shekel, baht, dong, rupiah, ringgit, dinar, zloty, forint, naira, shilling, canadian dollar|loonie, australian dollar, drachma, deutsche mark|mark, peseta, cent|penny` },
+  // Glow Up
+  clothing: { title: 'Clothing', list: `shirt|t shirt|tshirt|tee, jeans, pants|trousers, dress, skirt, jacket, sweater|jumper, hoodie, socks, coat, shorts, underwear, bra, scarf, gloves, leggings, suit, tie, belt, blouse, cardigan, vest, pajamas|pjs, swimsuit|bathing suit, bikini, overalls, jumpsuit, romper, tank top, crop top, blazer, sweatpants|joggers, beanie, baseball cap|cap, polo, turtleneck, kimono, robe, onesie, poncho, tuxedo, gown, corset, tights, flannel, windbreaker, raincoat, parka, cargo pants, camisole` },
+  makeup: { title: 'Things in a makeup bag', list: `lipstick, mascara, foundation, eyeliner, blush, concealer, eyeshadow, lip gloss, makeup brush|brushes|brush, powder, bronzer, highlighter, primer, setting spray, lip liner, brow pencil|eyebrow pencil, tweezers, mirror, beauty blender|sponge, eyelash curler|lash curler, false lashes|fake lashes|lashes, makeup wipes|wipes|makeup remover, cotton pads, moisturizer, sunscreen, nail polish, lip balm|chapstick, contour, setting powder, brow gel, tinted moisturizer, bb cream, glitter, face mist, palette, lip oil, lip stain, compact, bobby pins, hair tie` },
+  shoes: { title: 'Types of shoes', list: `sneakers|trainers|tennis shoes, boots, heels|high heels, sandals, flip flops, slippers, loafers, flats|ballet flats, crocs, cleats, rain boots|wellies, cowboy boots, uggs|ugg boots, stilettos, wedges, pumps, oxfords, mules, clogs, platforms, espadrilles, combat boots, hiking boots, running shoes, dress shoes, moccasins, boat shoes, slides, chelsea boots, mary janes, ankle boots, knee high boots|thigh high boots, ballet slippers|pointe shoes, tap shoes, bowling shoes, ski boots, ice skates|skates|roller skates, jordans|air jordans, converse, vans, birkenstocks, doc martens|dr martens|docs, kitten heels, water shoes` },
+  jewelry: { title: 'Jewelry', list: `ring, necklace, earrings|earring, bracelet, watch, anklet, chain, pendant, locket, brooch, tiara|crown, nose ring, choker, bangle, hoops|hoop earrings, studs, charm bracelet, engagement ring, wedding ring|wedding band, pearls|pearl necklace, diamonds|diamond, gold chain, toe ring, cufflinks, friendship bracelet, belly button ring|belly ring, lip ring, body chain, tennis bracelet, signet ring, grillz|grill, dog tags, beads, cuff, ear cuff, septum ring` },
+  hairstyles: { title: 'Hairstyles', list: `ponytail, bun, braids|braid, pigtails, bob, pixie cut|pixie, bangs|fringe, mullet, mohawk, buzz cut, afro, locs|dreadlocks|dreads, cornrows, man bun, bald, top knot, french braid, fishtail braid|fishtail, space buns, half up half down, beach waves|waves, curls|curly, straight, perm, layers|layered, shag, lob, undercut, fade, crew cut, comb over, pompadour, quiff, side part, wolf cut, box braids, twists, updo, chignon, beehive, messy bun, curtain bangs, faux hawk, slicked back, spikes|spiky` },
+  fabrics: { title: 'Fabrics', list: `cotton, silk, wool, denim, leather, polyester, linen, velvet, satin, lace, nylon, cashmere, spandex|lycra, fleece, flannel, suede, corduroy, tweed, chiffon, jersey, rayon, canvas, faux fur|fur, sequins, tulle, mesh, felt, muslin, organza, chenille, cheesecloth, gingham, plaid|tartan, terry cloth|terrycloth, viscose, bamboo, hemp, mohair, angora, vinyl|pvc, latex, taffeta, crepe, georgette` },
+  // Weekend Mode
+  hobbies: { title: 'Hobbies', list: `reading, gaming|video games, cooking, baking, drawing, painting, hiking, running, photography, gardening, knitting, writing, dancing, singing, yoga, fishing, camping, swimming, cycling|biking, traveling|travel, playing music|music, crochet, sewing, pottery, skateboarding, surfing, rock climbing|climbing, chess, puzzles, collecting, journaling, scrapbooking, origami, woodworking, birdwatching|bird watching, cosplay, thrifting, working out|gym|lifting, pilates, meditation, golf, tennis, bowling, karaoke, board games, podcasting, coding, calligraphy, embroidery, candle making, astronomy, sudoku, crosswords, ice skating, horseback riding` },
+  party: { title: 'Things at a party', list: `music, balloons|balloon, cake, drinks, snacks, chips, pizza, friends|people, presents|gifts|gift, decorations, dancing, speakers|speaker, lights, confetti, red cups|cups|solo cups, ice, games, candles, party hats|party hat, streamers, pinata, dj, beer, punch, cupcakes, ice cream, banner, photo booth, karaoke, dip|chips and dip, napkins, plates, cooler, beer pong, disco ball, playlist, invitations, gossip, glitter, sparklers, guests, host, noisemakers|noise makers, chocolate` },
+  park: { title: 'Things at a park', list: `trees|tree, grass, bench, swings|swing, slide, dogs|dog, playground, flowers, birds, pond, fountain, picnic table, kids, squirrels|squirrel, trash can, path|trail, sandbox, ducks|duck, basketball court, frisbee, kite, ice cream truck, bike|bicycle, joggers|runners, statue, gazebo, pigeons, seesaw|see saw, monkey bars|jungle gym, lake, bridge, picnic, blanket, soccer field, tennis court, water fountain, lamp post, rocks, leaves, bushes, grill|bbq, ball, skate park, dog park, carousel|merry go round, geese` },
+  gym: { title: 'Things at the gym', list: `treadmill, weights|dumbbells|dumbbell, bench, mirror, water bottle, towel, barbell, yoga mat|mat, exercise bike|bike|stationary bike, elliptical, rowing machine|rower, kettlebell, squat rack, pull up bar, personal trainer|trainer, lockers|locker, shower, music, headphones, protein shake, sweat, cable machine, medicine ball, jump rope, resistance bands, foam roller, weight plates|plates, leg press, smith machine, punching bag, sauna, pool, stairmaster|stair master|stairs, gym bag, chalk, lifting belt|belt, protein bar, vending machine, front desk, fan, tv` },
+  boardgames: { title: 'Board games', list: `monopoly, chess, scrabble, checkers, clue|cluedo, uno, sorry, risk, game of life|life|the game of life, candy land, jenga, connect four|connect 4, battleship, trivial pursuit, operation, catan|settlers of catan, guess who, pictionary, twister, mouse trap, apples to apples, cards against humanity, codenames, ticket to ride, yahtzee, backgammon, mahjong, dominoes, boggle, taboo, stratego, othello|reversi, chutes and ladders|snakes and ladders, mancala, go, pandemic, exploding kittens, hungry hungry hippos, kerplunk, sequence, rummikub, scattergories, balderdash, cranium, carcassonne, azul, wingspan, dixit, splendor, dungeons and dragons|d and d|dnd` },
+  sunday: { title: 'Things you do on a Sunday', list: `sleep in|sleep, brunch, laundry, church, relax, read, nap, clean, watch tv|tv, netflix, meal prep, grocery shopping|groceries, watch football|football, hike, walk, cook, bake, call mom|call family, yoga, work out|gym, self care, face mask, homework, garden, movies|movie, video games|gaming, pancakes, coffee, farmers market, bike ride, beach, family dinner, plan the week, iron, bath, journal, podcast, sunday scaries, picnic, golf, mimosas, sunday roast|roast dinner, crossword` },
+  // Spooky Season
+  costumes: { title: 'Halloween costumes', list: `witch, ghost, vampire, zombie, pirate, cat, skeleton, princess, superhero, devil, angel, mummy, werewolf, clown, nurse, doctor, cowboy, ninja, cop|police officer, firefighter, batman, spiderman|spider man, superman, wonder woman, pumpkin, frankenstein, dracula, fairy, mermaid, dinosaur, bunny|rabbit, alien, astronaut, scarecrow, grim reaper, joker, harley quinn, elsa, minion, pikachu, hippie, nun, bride, banana, hot dog, ladybug, bumblebee|bee, black cat, toga, mario, luigi, wednesday addams|wednesday, ghostface, michael myers, freddy krueger|freddy, jason, barbie, shrek, dorothy, little red riding hood, robin hood, peter pan, tinker bell, cleopatra, viking, gladiator, sailor, chef, mime, gnome, unicorn` },
+  monsters: { title: 'Monsters & creepy creatures', list: `vampire, zombie, ghost, werewolf, mummy, witch, frankenstein|frankensteins monster, skeleton, demon, bigfoot|sasquatch, dragon, goblin, troll, alien, banshee, ghoul, poltergeist, wraith, gremlin, kraken, loch ness monster|nessie, chupacabra, yeti, mothman, wendigo, medusa, cyclops, minotaur, hydra, gorgon, sphinx, griffin, phantom, specter|spectre, imp, ogre, orc, lich, golem, siren, kappa, jersey devil, slender man|slenderman, boogeyman|bogeyman, headless horseman, grim reaper, chucky, dracula, godzilla, king kong, blob, pennywise` },
+  haunted: { title: 'Things in a haunted house', list: `ghosts|ghost, cobwebs|cobweb|spider webs, spiders|spider, bats|bat, skeleton, coffin, candles|candle, creaky stairs|stairs, portraits|portrait|paintings, mirror, chandelier, creaky door|doors, attic, basement, cauldron, skulls|skull, rats|rat, black cat|cat, chains, organ, dust, rocking chair, creepy doll|doll, music box, ouija board, crystal ball, broom, fog, flickering lights, secret passage, trapdoor|trap door, grandfather clock|clock, suit of armor|armor, gargoyle, raven|crow, owl, jack o lantern|pumpkins|pumpkin, tombstone|gravestone, graveyard|cemetery, screams|scream, footsteps, butler, cold spot, full moon|moon` },
+  candy: { title: 'Halloween candy', list: `snickers, reeses|reeses cups|peanut butter cups, kit kat|kitkat, mms|m and ms, skittles, twix, candy corn, milky way, starburst, butterfinger, sour patch kids, hersheys|hershey bar, tootsie roll|tootsie rolls, nerds, smarties, laffy taffy, jolly ranchers|jolly rancher, twizzlers, swedish fish, gummy bears|gummies, lollipops|lollipop|dum dums, three musketeers|3 musketeers, almond joy, mounds, whoppers, milk duds, airheads, warheads, pop rocks, hersheys kisses|kisses, peppermint patty|york peppermint patty, baby ruth, payday, heath, crunch|nestle crunch, junior mints, mike and ikes|mike and ike, caramel apple|candy apple, caramels, raisins, toblerone, ring pop, blow pop, gummy worms|sour gummy worms, fun dip, pixy stix, bit o honey, good and plenty, licorice|black licorice, peeps, rolo, 100 grand, take 5` },
+  orange: { title: 'Things that are orange', list: `orange, carrot, pumpkin, basketball, traffic cone|cone, goldfish, tiger, fox, sunset, cheetos, candy corn, sweet potato, apricot, tangerine, cheddar|cheese, clownfish|nemo, garfield, monarch butterfly|butterfly, autumn leaves|leaves, prison jumpsuit|jumpsuit, life jacket|life vest, safety vest, fire, lava, mango, cantaloupe, peach, salmon, koi, orangutan, marigold, papaya, persimmon, buoy, rust, tiger lily, butternut squash|squash, nacho cheese, doritos, fanta, cheez its, mac and cheese` },
+  black: { title: 'Things that are black', list: `night|night sky, black cat|cat, crow|raven, coal, tires|tire, oil, licorice, ink, panther, bat, tuxedo, coffee, shadow, asphalt|road, charcoal, olives, black beans, pepper, spider, witch hat, hearse, piano keys, oreo, darth vader, batman, limo|limousine, chalkboard, leather jacket, eyeliner, sunglasses, trash bag|garbage bag, cast iron pan|skillet, obsidian, onyx, top hat, ninja, gorilla, black hole, tar, soot, vinyl record|record, hockey puck` },
+  // Grocery Run
+  vegetables: { title: 'Vegetables', list: `carrot, broccoli, potato, lettuce, tomato, cucumber, onion, spinach, corn, peas, celery, bell pepper|peppers|pepper, cabbage, cauliflower, zucchini, eggplant, garlic, mushroom|mushrooms, green beans|beans, asparagus, kale, sweet potato, pumpkin, radish, beets|beet, brussels sprouts, artichoke, avocado, squash, okra, leek, turnip, parsnip, bok choy, arugula, swiss chard|chard, collard greens|collards, yam, jalapeno, ginger, shallot, green onion|scallion|spring onion, fennel, rutabaga, edamame, snap peas, bean sprouts, watercress, jicama, kohlrabi, endive, radicchio, daikon` },
+  fridge: { title: 'Things in a fridge', list: `milk, eggs|egg, cheese, butter, water, orange juice|juice, leftovers, ketchup, mustard, mayo|mayonnaise, yogurt, fruit, vegetables|veggies, lettuce, beer, soda, ham, chicken, jam|jelly, pickles, salsa, hot sauce, wine, cream, sour cream, hummus, bacon, tofu, salad dressing|dressing, lemons|lemon, apples|apple, grapes, strawberries|berries, carrots, celery, deli meat|cold cuts, hot dogs, cream cheese, cake, pie, soy sauce, sriracha, maple syrup|syrup, baking soda, tortillas, kimchi, olives, leftover pizza|pizza, takeout` },
+  breakfast: { title: 'Breakfast foods', list: `eggs, pancakes, bacon, toast, cereal, waffles|waffle, oatmeal, yogurt, coffee, orange juice|juice, sausage, bagel, muffin, french toast, hash browns|hashbrowns, fruit, banana, croissant, omelette|omelet, smoothie, granola, donut|doughnut, avocado toast, breakfast burrito, biscuits and gravy|biscuits, grits, cinnamon roll, crepes|crepe, scrambled eggs, eggs benedict, quiche, frittata, english muffin, pop tarts, porridge, shakshuka, chilaquiles, huevos rancheros, congee, ham, scone, danish, parfait, acai bowl, chia pudding, tea` },
+  condiments: { title: 'Condiments & sauces', list: `ketchup, mustard, mayo|mayonnaise, ranch, hot sauce, bbq sauce|barbecue sauce, soy sauce, relish, salsa, sriracha, honey mustard, salt, pepper, vinegar, olive oil, sour cream, guacamole, hummus, tartar sauce, horseradish, wasabi, teriyaki, worcestershire|worcestershire sauce, buffalo sauce, thousand island, blue cheese|blue cheese dressing, italian dressing, tzatziki, pesto, chimichurri, aioli, gochujang, hoisin, fish sauce, chili oil|chili crisp, tabasco, sweet chili sauce, cocktail sauce, cranberry sauce, gravy, maple syrup, honey, nutella, peanut butter, marmite|vegemite, sauerkraut` },
+  cheeses: { title: 'Cheeses', list: `cheddar, mozzarella, swiss, parmesan|parmigiano, brie, gouda, feta, american, provolone, blue cheese|bleu cheese, cream cheese, goat cheese|chevre, pepper jack, monterey jack, colby, ricotta, camembert, gruyere, havarti, muenster, manchego, halloumi, cottage cheese, mascarpone, burrata, string cheese, gorgonzola, roquefort, stilton, pecorino, asiago, emmental, fontina, edam, queso fresco, paneer, oaxaca, cotija, limburger, velveeta, babybel, boursin, raclette, taleggio, jarlsberg` },
+  spices: { title: 'Spices & herbs', list: `salt, black pepper|pepper, garlic powder|garlic, cinnamon, paprika, oregano, basil, cumin, chili powder, ginger, thyme, rosemary, parsley, turmeric, nutmeg, cayenne, curry powder|curry, onion powder, bay leaves|bay leaf, cilantro|coriander, dill, sage, mint, cloves|clove, cardamom, saffron, vanilla, allspice, mustard seed, fennel, star anise, chives, tarragon, marjoram, red pepper flakes|chili flakes, sesame seeds|sesame, poppy seeds, smoked paprika, garam masala, zaatar, sumac, five spice, italian seasoning, old bay, lemon pepper, everything bagel seasoning, msg, white pepper, caraway, lemongrass, fenugreek` },
+});
+LADDERS.push(
+  { name: 'Night Out', emoji: '🍸', rounds: ['drinks', 'bar', 'latenight', 'bag', 'concert', 'cocktails'] },
+  { name: 'Around the World', emoji: '✈️', rounds: ['countries', 'cities', 'airport', 'languages', 'islands', 'currencies'] },
+  { name: 'Glow Up', emoji: '💄', rounds: ['clothing', 'makeup', 'shoes', 'jewelry', 'hairstyles', 'fabrics'] },
+  { name: 'Weekend Mode', emoji: '🛋️', rounds: ['hobbies', 'party', 'park', 'gym', 'boardgames', 'sunday'] },
+  { name: 'Spooky Season', emoji: '🎃', rounds: ['costumes', 'monsters', 'haunted', 'candy', 'orange', 'black'] },
+  { name: 'Grocery Run', emoji: '🛒', rounds: ['vegetables', 'fridge', 'breakfast', 'condiments', 'cheeses', 'spices'] },
+);
+
+// Final Showdown: tiny categories, so matches are almost guaranteed.
+const SHOWDOWN = {
+  sd_days: { title: 'Days of the week', list: `friday|fri, saturday|sat, monday|mon, sunday|sun, wednesday|wed, tuesday|tue|tues, thursday|thu|thurs` },
+  sd_seasons: { title: 'Seasons', list: `summer, winter, fall|autumn, spring` },
+  sd_continents: { title: 'Continents', list: `africa, asia, europe, north america|na, south america|sa, australia|oceania|australasia, antarctica` },
+  sd_planets: { title: 'Planets', list: `mars, earth, jupiter, saturn, venus, mercury, neptune, uranus, pluto` },
+  sd_suits: { title: 'Card suits', list: `hearts|heart, spades|spade, diamonds|diamond, clubs|club` },
+  sd_chess: { title: 'Chess pieces', list: `king, queen, knight|horse, pawn, rook|castle|tower, bishop` },
+  sd_rainbow: { title: 'Colors of the rainbow', list: `red, blue, green, yellow, orange, purple, violet, indigo` },
+  sd_meals: { title: 'Meals', list: `breakfast, dinner, lunch, brunch, snack|snacks, dessert, supper, midnight snack, linner, elevenses, tea|afternoon tea` },
+  sd_oceans: { title: 'Oceans', list: `pacific, atlantic, indian, arctic, southern|antarctic` },
+  sd_senses: { title: 'The five senses', list: `sight|vision|seeing|see|eyes|eyesight|seeing things, smell|smelling|nose|scent|smells, taste|tasting|tongue, touch|feel|feeling|touching, hearing|hear|ears|sound|sounds|listening|listen` },
+  sd_directions: { title: 'Directions', list: `north, south, east, west, up, down, left, right` },
+  sd_medals: { title: 'Olympic medals', list: `gold|gold medal, silver|silver medal, bronze|bronze medal` },
+};
+Object.assign(CATS, SHOWDOWN);
+const SD_MAX = 6;
+Object.values(CATS).forEach(c => {
+  c.answers = c.list.split(',').map(x => x.trim()).filter(Boolean).map(e => {
+    const al = e.split('|').map(x => x.trim());
+    return { show: al[0], key: key(al[0]), keys: al.map(key) };
+  });
+  c.byKey = new Map(); c.answers.forEach(a => a.keys.forEach(k => { if (!c.byKey.has(k)) c.byKey.set(k, a); }));
+});
+function wordForms(k) { // hear <-> hearing, bake <-> baking, swim <-> swimming
+  const v = [];
+  if (k.endsWith('ing') && k.length > 5) { const b = k.slice(0, -3); v.push(b, b + 'e'); if (/(.)$/.test(b)) v.push(b.slice(0, -1)); }
+  else { v.push(k + 'ing'); if (k.endsWith('e')) v.push(k.slice(0, -1) + 'ing'); if (/[^aeiou][aeiou][bdgmnprt]$/.test(k)) v.push(k + k.slice(-1) + 'ing'); }
+  return v;
+}
+function findAnswer(cat, text) {
+  const k = key(text); if (!k) return null;
+  if (cat.byKey.has(k)) return cat.byKey.get(k);
+  for (const v of wordForms(k)) if (cat.byKey.has(v)) return cat.byKey.get(v);
+  if (k.length >= 5) { // forgive one typo (two in long words)
+    let best = null, bd = 9;
+    for (const [kk, a] of cat.byKey) { const d = lev(k, kk); if (d < bd) { bd = d; best = a; } }
+    if (best && (bd <= 1 || (bd <= 2 && k.length >= 9))) return best;
+  }
+  // "banana peppers", "red onion", "buffalo chicken": a describing word or two + a known answer
+  // counts as its own, different answer (so it doesn't jinx someone who just said "peppers")
+  const words = norm(text).split(' ').filter(Boolean);
+  if (words.length >= 2 && words.length <= 4) {
+    for (let i = 1; i < words.length; i++) {
+      const mod = words.slice(0, i).join(' '), tk = key(words.slice(i).join(' '));
+      const hit = cat.byKey.get(tk) || wordForms(tk).map(v => cat.byKey.get(v)).find(Boolean);
+      if (hit && i <= 2 && mod.replace(/ /g, '').length >= 3 && /^[a-z ]+$/.test(mod)) return { show: words.join(' '), key: k, base: hit.show };
+    }
+  }
+  return null;
+}
+
+// Inside Claude (published artifact): ask Claude about answers the list doesn't know. As a plain file this does nothing.
+const samplePromise = (window.claude && typeof window.claude.use === 'function') ? window.claude.use('sample').catch(() => null) : Promise.resolve(null);
+async function askAI(cat, text) {
+  const sample = await samplePromise; if (!sample || !sample.json) return null;
+  const prompt = `Word game referee. Category: "${cat.title}". Player typed: ${JSON.stringify(text)}.
+Is this a real, reasonable answer for the category? If yes, give its plain common name (singular, lowercase, fixed spelling) so that spelling variants of the same thing match.
+Reply with only JSON: {"valid": true|false, "name": "..."}`;
+  try {
+    const r = await Promise.race([sample.json(prompt, { modelTier: 'quick' }), sleep(8000).then(() => null)]);
+    if (r && r.valid && r.name) { const hit = cat.byKey.get(key(r.name)); return hit || { show: String(r.name).slice(0, 30), key: key(r.name) }; }
+    if (r && r.valid === false) return false;
+  } catch {}
+  return null;
+}
+
+/* ===================== players ===================== */
+// s: how strongly a bot goes for common answers. Negative = deliberately obscure.
+const BOTS = [
+  { name: 'Kai',  c: '#4fc3ff', d: '#2fa3e0', s: 1.3 },
+  { name: 'Rosa', c: '#ff4fa0', d: '#e03587', s: 1.6 },
+  { name: 'Mo',   c: '#ff8a1f', d: '#e06d00', s: 1.0 },
+  { name: 'Theo', c: '#9b7bff', d: '#7d5ce6', s: -0.8 },
+  { name: 'Juno', c: '#2fe0a6', d: '#14bf88', s: 1.15 },
+  { name: 'Remy', c: '#ffd23f', d: '#e6b800', s: -0.6 },
+  { name: 'Ivy',  c: '#ff6b6b', d: '#e04848', s: 0.8 },
+];
+function botPick(bot, cat, used) {
+  const pool = cat.answers.map((a, i) => ({ a, i })).filter(x => !used.has(x.a.key));
+  if (!pool.length) return null;
+  const ws = pool.map(x => Math.pow(x.i + 1, -bot.s));
+  let r = Math.random() * ws.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < pool.length; i++) { r -= ws[i]; if (r <= 0) return pool[i].a; }
+  return pool[pool.length - 1].a;
+}
+
+/* ===================== sound effects (made in the browser, no files) ===================== */
+const SFX = (() => {
+  let ctx = null, on = localStorage.getItem('lws_sound') !== 'off';
+  const ac = () => {
+    if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  };
+  function tone(freq, dur, { type = 'sine', vol = .18, at = 0, slide = 0, attack = .006 } = {}) {
+    const c = on && ac(); if (!c) return;
+    const t = c.currentTime + at, o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + .03);
+  }
+  function noise(dur, { vol = .2, at = 0, freq = 800, kind = 'lowpass' } = {}) {
+    const c = on && ac(); if (!c) return;
+    const t = c.currentTime + at, len = Math.floor(c.sampleRate * dur), b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+    const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+    s.buffer = b; f.type = kind; f.frequency.value = freq; g.gain.value = vol;
+    s.connect(f).connect(g).connect(c.destination); s.start(t);
+  }
+  return {
+    get on() { return on; },
+    toggle() { on = !on; localStorage.setItem('lws_sound', on ? 'on' : 'off'); if (on) this.lock(); },
+    unlock() { if (on) ac(); },
+    start() { tone(523, .12, { type: 'triangle', vol: .14 }); tone(784, .2, { type: 'triangle', vol: .14, at: .11 }); },
+    showdown() { tone(110, .7, { type: 'sawtooth', vol: .07, slide: 110 }); tone(220, .7, { type: 'square', vol: .035, slide: 220, at: .05 }); tone(880, .25, { type: 'triangle', vol: .12, at: .65 }); },
+    tick(hot) { tone(hot ? 1560 : 1200, .05, { type: 'square', vol: hot ? .07 : .045 }); },
+    lock() { tone(660, .06, { type: 'triangle', vol: .14 }); tone(990, .09, { type: 'triangle', vol: .12, at: .05 }); },
+    nope() { tone(200, .14, { type: 'sawtooth', vol: .06 }); },
+    pop(i = 0) { tone(420 + i * 55, .08, { type: 'sine', vol: .15, slide: 260 }); },
+    jinx() { noise(.12, { vol: .7, freq: 260 }); tone(85, .16, { type: 'sine', vol: .3, slide: -35 }); tone(140, .5, { type: 'sawtooth', vol: .1, at: .1 }); tone(148, .5, { type: 'square', vol: .06, at: .1 }); },
+    clean() { [523, 659, 784].forEach((f, i) => tone(f, .13, { type: 'sine', vol: .1, at: i * .07 })); },
+    safe() { [659, 784, 1047].forEach((f, i) => tone(f, .17, { type: 'triangle', vol: .12, at: .25 + i * .08 })); },
+    out() { [392, 330, 262, 196].forEach((f, i) => tone(f, .24, { type: 'triangle', vol: .12, at: .35 + i * .14 })); },
+    win() { [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, .22, { type: 'triangle', vol: .13, at: i * .11 })); noise(.8, { vol: .06, freq: 5000, kind: 'highpass', at: .55 }); },
+  };
+})();
+
+/* ===================== game ===================== */
+const CROWD = [3, 4, 5, 6, 7, 8];          // solo/daily: this many of the most common answers are off-limits each round
+const LS = {
+  get(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch { return d; } },
+  set(k, v) { localStorage.setItem(k, JSON.stringify(v)); },
+};
+const stats = LS.get('lws_stats2', { lobbyPlayed: 0, lobbyWins: 0, soloPlayed: 0, soloBest: 0, dailyDays: [] });
+const saveStats = () => LS.set('lws_stats2', stats);
+let G = null, ROOM = null, screen = 'home';
+const NET = { role: null, peer: null, conns: new Map(), conn: null, status: '', error: '', notice: '', joining: false, sync: false };
+const PAL = [['#cbeb00', '#afc800'], ['#4fc3ff', '#2fa3e0'], ['#ff4fa0', '#e03587'], ['#ff8a1f', '#e06d00'], ['#9b7bff', '#7d5ce6'], ['#2fe0a6', '#14bf88'],
+             ['#ffd23f', '#e6b800'], ['#ff6b6b', '#e04848'], ['#a0e7e5', '#6fc3c0'], ['#b4a7ff', '#8f80e6'], ['#ffb3c7', '#e98aa5'], ['#c3f584', '#9cd65a']];
+const myName = () => LS.get('unj_name', '') || 'Player';
+const YOU = () => ({ id: 0, name: 'You', c: PAL[0][0], d: PAL[0][1], isYou: true });
+const myId = () => (ROOM && ROOM.myId != null) ? ROOM.myId : 0;
+const pickL = a => a[Math.floor(Math.random() * a.length)];
+const cap1 = s => s.charAt(0).toUpperCase() + s.slice(1);
+const listJoin = a => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+const isHost = () => !!ROOM && !ROOM.remote;
+
+/* ---------- daily ---------- */
+const fmtDay = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const todayStr = () => fmtDay(new Date());
+function dayNumber() { const d = new Date(); return Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(2026, 10, 20)) / 86400000) + 1; }
+function seeded(seed) { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function dailyLadder() {
+  const n = dayNumber(), rnd = seeded(n * 7919 + 13);
+  const ids = Object.keys(CATS).filter(k => !k.startsWith('sd_')).sort();
+  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+  const rounds = ids.slice(0, 6).sort((a, b) => CATS[b].answers.length - CATS[a].answers.length); // broad -> narrow
+  return { name: `Daily #${n}`, emoji: '📅', rounds };
+}
+function dailyStreak() { const days = new Set(stats.dailyDays); let s = 0; const d = new Date(); if (!days.has(fmtDay(d))) d.setDate(d.getDate() - 1); while (days.has(fmtDay(d))) { s++; d.setDate(d.getDate() - 1); } return s; }
+const dailySaved = () => LS.get('lws_daily_' + todayStr(), null);
+
+/* ---------- room chat ---------- */
+const HELLO = ['hiii', 'hey!', 'yo', 'hello 👋', 'lets goooo', 'ready when you are', 'hi everyone', '👋'];
+const SAD = ['nooo 😭', 'rip me', 'HOW', 'i really thought that was unique', 'pain', 'ugh', 'why did i say that', '😭😭', 'robbed'];
+const LAUGH = ['lmaooo', '💀💀', 'called it', 'jinx lol', 'yikes', 'the jinx is real', 'LOL', 'great minds think alike i guess'];
+const CLEAN = ['ooh close one', 'nice', 'everyone survived??', 'sweating rn', 'phew', 'ok this is getting hard'];
+const GG = ['gg', 'gg wp', 'good game!', 'rematch?', 'that was fun', 'gg everyone', 'one more?'];
+function roomAfter(ms, f) { const r = ROOM; if (!r) return; r.timers.push(setTimeout(() => { if (ROOM === r && !r.dead) f(); }, ms)); }
+function chatPush(m) { if (!ROOM || ROOM.remote) return; ROOM.chat.push(m); if (ROOM.chat.length > 150) ROOM.chat.shift(); renderFeed(); }
+const sysSay = t => chatPush({ kind: 'sys', text: t });
+const chatSay = (p, t) => { if (!p || p.left) return; chatPush({ kind: 'msg', name: p.name, c: p.d || p.c, text: t, pid: p.id }); };
+function botsIn(list) { return list.filter(p => p.bot && !p.left); }
+function replyTo(text) {
+  const pool = botsIn(G && screen === 'game' ? G.players : ROOM.players);
+  if (!pool.length || Math.random() > .5) return;
+  const t = text.toLowerCase();
+  let opts = ['lol', 'fr', '😂', 'true', 'ok but same', '💀', 'haha', 'real'];
+  if (/\b(hi|hey|hello|yo|sup)\b/.test(t)) opts = ['hiii', 'hey!', 'yo 👋', 'hello hello'];
+  else if (/\bgg\b/.test(t)) opts = ['gg!', 'gg wp', 'ggs'];
+  else if (t.includes('?')) opts = ['idk', 'maybe?', 'no clue lol', 'good question', 'hmm'];
+  const p = pickL(pool), ms = 900 + Math.random() * 1800;
+  (G && screen === 'game' ? after : roomAfter)(ms, () => chatSay(p, pickL(opts)));
+}
+function sendChat(text) {
+  if (ROOM.remote) { netSend({ t: 'chat', text }); return; }
+  chatSay(G && screen === 'game' ? G.you : ROOM.players[0], text); replyTo(text);
+}
+
+/* ---------- rooms: host side ---------- */
+function makeCode() { return Array.from({ length: 4 }, () => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 31)]).join(''); }
+const peerIdFor = code => 'unjinxable-room-' + code.toLowerCase();
+function freeColor() {
+  const used = new Set([...ROOM.players, ...ROOM.watchers].map(p => p.c));
+  return PAL.find(([c]) => !used.has(c)) || pickL(PAL);
+}
+function uniqueName(n) {
+  n = (n || 'Player').replace(/[^\p{L}\p{N} _.'-]/gu, '').trim().slice(0, 16) || 'Player';
+  const taken = new Set([...ROOM.players, ...ROOM.watchers].map(p => p.name.toLowerCase()));
+  let out = n, i = 2; while (taken.has(out.toLowerCase())) out = `${n} ${i++}`;
+  return out;
+}
+function createRoom() {
+  saveNameField();
+  if (ROOM) closeRoom();
+  SFX.unlock();
+  ROOM = { code: makeCode(), players: [{ id: 0, name: myName(), c: PAL[0][0], d: PAL[0][1], isYou: true, host: true }], chat: [], watchers: [], timers: [], dead: false, nextId: 1, myId: 0 };
+  NET.role = 'host'; NET.status = 'connecting'; NET.error = '';
+  screen = 'room'; render();
+  sysSay(`You created room ${ROOM.code}`);
+  hostOpenPeer();
+}
+function hostOpenPeer(tries = 0) {
+  if (typeof Peer === 'undefined') { NET.status = 'offline'; refreshRoom(); return; }
+  const r = ROOM, peer = new Peer(peerIdFor(r.code), { debug: 0 });
+  NET.peer = peer;
+  peer.on('open', () => { if (ROOM !== r) return peer.destroy(); NET.status = 'online'; refreshRoom(); });
+  peer.on('error', err => {
+    if (ROOM !== r) return;
+    if (err.type === 'unavailable-id' && tries < 4) { peer.destroy(); r.code = makeCode(); r.chat = []; sysSay(`You created room ${r.code}`); hostOpenPeer(tries + 1); return; }
+    if (err.type === 'peer-unavailable') return;
+    NET.status = 'offline'; refreshRoom();
+  });
+  peer.on('disconnected', () => { if (ROOM === r && !r.dead) try { peer.reconnect(); } catch {} });
+  peer.on('connection', conn => {
+    conn.on('data', msg => hostOnData(conn, msg));
+    conn.on('close', () => hostOnClose(conn));
+  });
+}
+function hostOnData(conn, msg) {
+  if (!ROOM || ROOM.remote || !msg || typeof msg !== 'object') return;
+  if (msg.t === 'hello' && conn.pid == null) {
+    const [c, d] = freeColor();
+    const p = { id: ROOM.nextId++, name: uniqueName(String(msg.name || '')), c, d, remote: true };
+    conn.pid = p.id; NET.conns.set(p.id, conn);
+    const midGame = screen === 'game' && G && G.mode === 'lobby' && G.phase !== 'end';
+    if (midGame || ROOM.players.length >= 8) { ROOM.watchers.push(p); sysSay(`${p.name} joined and is watching${midGame ? ' until the next game' : ''}`); }
+    else { ROOM.players.push(p); sysSay(`${p.name} joined`); }
+    SFX.pop(4); refreshRoom(); return;
+  }
+  const pid = conn.pid; if (pid == null) return;
+  const who = [...ROOM.players, ...ROOM.watchers].find(p => p.id === pid);
+  if (msg.t === 'chat' && who) {
+    const text = String(msg.text || '').trim().slice(0, 140); if (!text) return;
+    const gp = G && screen === 'game' ? G.players.find(p => p.id === pid) : null;
+    chatSay(gp || who, text); replyTo(text);
+  }
+  if (msg.t === 'lock' && G && G.mode === 'lobby' && G.phase === 'play') {
+    const p = G.players.find(q => q.id === pid);
+    const key = String(msg.key || '').slice(0, 60), show = String(msg.show || '').slice(0, 40);
+    if (!p || !p.alive || G.locks[pid] !== undefined || !key || G.used.has(key)) return;
+    G.locks[pid] = { show, key, unverified: !!msg.unverified }; renderSeats(); checkAllLocked();
+  }
+  if (msg.t === 'vote') castVote(+msg.pid, msg.v === 'down' ? 'down' : 'up', pid);
+  if (msg.t === 'bye') hostOnClose(conn);
+}
+function hostOnClose(conn) {
+  const pid = conn.pid; if (pid == null || !ROOM || ROOM.remote) return;
+  conn.pid = null; NET.conns.delete(pid);
+  const who = [...ROOM.players, ...ROOM.watchers].find(p => p.id === pid); if (!who) return;
+  ROOM.players = ROOM.players.filter(p => p.id !== pid); ROOM.watchers = ROOM.watchers.filter(p => p.id !== pid);
+  if (G && G.mode === 'lobby') {
+    const gp = G.players.find(p => p.id === pid);
+    if (gp && !gp.left) { gp.left = true; if (gp.alive && G.phase !== 'end') { gp.alive = false; gp.outRound = G.round; gp.place = alive().length + 1; } }
+    if (G.phase === 'play') checkAllLocked();
+  }
+  sysSay(`${who.name} left`);
+  refreshRoom();
+}
+function addBot() {
+  const b = BOTS.find(b => !ROOM.players.some(p => p.name === b.name));
+  if (!b || ROOM.players.length >= 8) return;
+  const p = { ...b, id: ROOM.nextId++, bot: true }; ROOM.players.push(p);
+  sysSay(`${p.name} (computer) joined`);
+  if (Math.random() < .4) roomAfter(600 + Math.random() * 1200, () => chatSay(p, pickL(HELLO)));
+  render();
+}
+function removeBot() { const b = [...ROOM.players].reverse().find(p => p.bot); if (!b) return; ROOM.players = ROOM.players.filter(p => p !== b); sysSay(`${b.name} (computer) left`); render(); }
+function refreshRoom() { if (screen === 'room') render(); else { renderSide(); if (screen === 'game') renderSeats(); } sync(); }
+function closeRoom() {
+  if (NET.role === 'host') { NET.conns.forEach(c => { try { c.send({ t: 'closed' }); } catch {} }); }
+  if (NET.role === 'client') netSend({ t: 'bye' });
+  const peer = NET.peer;
+  setTimeout(() => { NET.conns.forEach(c => { try { c.close(); } catch {} }); NET.conns = new Map(); try { NET.conn && NET.conn.close(); } catch {} try { peer && peer.destroy(); } catch {} }, 150);
+  NET.role = null; NET.peer = null; NET.conn = null; NET.status = '';
+  if (ROOM) { ROOM.dead = true; ROOM.timers.forEach(clearTimeout); }
+  ROOM = null;
+}
+function goHome() { if (G) { G.dead = true; clearTimers(); } G = null; closeRoom(); screen = 'home'; render(); }
+window.addEventListener('beforeunload', () => { try { if (NET.role === 'host') NET.conns.forEach(c => c.send({ t: 'closed' })); if (NET.role === 'client') netSend({ t: 'bye' }); } catch {} });
+
+/* host -> everyone: a snapshot of the room and game */
+function sync() {
+  if (NET.role !== 'host' || NET.sync || !ROOM) return;
+  NET.sync = true;
+  setTimeout(() => { NET.sync = false; if (!ROOM || ROOM.remote) return; NET.conns.forEach((c, pid) => { if (c.open) try { c.send(snapshotFor(pid)); } catch {} }); }, 40);
+}
+function snapshotFor(pid) {
+  const pub = p => ({ id: p.id, name: p.name, c: p.c, d: p.d, bot: !!p.bot, host: !!p.host });
+  const theme = localStorage.getItem('lws_theme') || 'random';
+  const s = { t: 'state', you: pid, room: { code: ROOM.code, players: ROOM.players.map(pub), watchers: ROOM.watchers.map(pub), chat: ROOM.chat.slice(-100), theme }, game: null };
+  if (screen === 'game' && G && G.mode === 'lobby') {
+    const locks = {}, lockedIds = [];
+    G.players.forEach(p => {
+      const a = G.locks[p.id]; if (a === undefined) return;
+      if ((G.phase !== 'play' && G.revealed.has(p.id)) || p.id === pid) locks[p.id] = a ? { show: a.show, key: a.key, unverified: !!a.unverified } : null;
+      else lockedIds.push(p.id);
+    });
+    s.game = {
+      ladder: G.ladder, sd: G.sd, round: G.round, phase: G.phase, remaining: G.deadline - Date.now(), total: G.total,
+      players: G.players.map(p => ({ id: p.id, name: p.name, c: p.c, d: p.d, bot: !!p.bot, alive: p.alive, outRound: p.outRound, place: p.place, left: !!p.left, hist: p.hist })),
+      locks, lockedIds, revealed: [...G.revealed], lastRev: G.lastRev,
+      result: G.result ? { out: [...G.result.out], spared: G.result.spared, groups: [...G.result.groups.values()].map(g => g.map(p => p.id)), rejected: [...(G.result.rejected || [])], votes: G.result.votes || [] } : null,
+      vote: G.vote ? { left: G.vote.ends - Date.now(), items: G.vote.items.map(it => ({ pid: it.pid, name: it.name, show: it.show, up: it.up.size, down: it.down.size, mine: it.up.has(pid) ? 'up' : it.down.has(pid) ? 'down' : null })) } : null,
+      beaming: G.beaming ? [...G.beaming] : null, used: [...G.used], usedShow: G.usedShow, autoLeft: G.autoLeft,
+    };
+  }
+  return s;
+}
+
+/* ---------- rooms: joining side ---------- */
+function joinRoom() {
+  saveNameField();
+  const code = ($('#codeIn').value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+  if (code.length !== 4) { NET.error = 'Room codes are 4 letters/numbers.'; render(); return; }
+  if (typeof Peer === 'undefined') { NET.error = "Couldn't load the online part of the game. Check your internet connection."; render(); return; }
+  SFX.unlock();
+  closeRoom();
+  NET.role = 'client'; NET.joining = true; NET.error = ''; render();
+  const peer = new Peer({ debug: 0 }); NET.peer = peer;
+  const fail = m => { if (NET.peer !== peer) return; NET.joining = false; NET.error = m; NET.role = null; try { peer.destroy(); } catch {} NET.peer = null; screen = 'online'; ROOM = null; G = null; render(); };
+  const timer = setTimeout(() => { if (NET.joining) fail(`Couldn't reach room ${code}. Check the code and that the host is still in the room.`); }, 15000);
+  peer.on('error', err => { clearTimeout(timer); fail(err.type === 'peer-unavailable' ? `There's no room called ${code} right now. Check the code?` : "Couldn't connect. Check your internet and try again."); });
+  peer.on('open', () => {
+    const conn = peer.connect(peerIdFor(code), { reliable: true }); NET.conn = conn;
+    conn.on('open', () => conn.send({ t: 'hello', name: myName() }));
+    conn.on('data', msg => { if (msg && msg.t === 'state') { clearTimeout(timer); NET.joining = false; applyState(msg); } else if (msg && msg.t === 'closed') hostGone('The host closed the room.'); });
+    conn.on('close', () => { if (NET.conn === conn) hostGone('You lost connection to the room.'); });
+  });
+}
+function netSend(m) { try { if (NET.conn && NET.conn.open) NET.conn.send(m); } catch {} }
+function hostGone(msg) { if (NET.role !== 'client') return; NET.notice = msg; if (G) G.dead = true; G = null; closeRoom(); screen = 'home'; render(); }
+function saveNameField() { const i = $('#nameIn'); if (i) { const n = i.value.trim().slice(0, 16); LS.set('unj_name', n); } }
+
+function applyState(s) {
+  const prevG = G, prevScreen = screen;
+  ROOM = Object.assign(ROOM && ROOM.remote ? ROOM : { timers: [], dead: false, remote: true }, { code: s.room.code, players: s.room.players, watchers: s.room.watchers, chat: s.room.chat, theme: s.room.theme, myId: s.you });
+  ROOM.players.forEach(p => p.isYou = p.id === s.you);
+  if (s.game) {
+    const gs = s.game;
+    const players = gs.players.map(p => ({ ...p, isYou: p.id === s.you }));
+    const byId = Object.fromEntries(players.map(p => [p.id, p]));
+    let you = byId[s.you];
+    if (!you) you = { id: s.you, name: 'You', isYou: true, alive: false, outRound: -1, place: null, hist: [], phantom: true };
+    const locks = {}; Object.entries(gs.locks).forEach(([id, a]) => locks[id] = a);
+    gs.lockedIds.forEach(id => { if (locks[id] === undefined) locks[id] = { show: '', key: '?' }; });
+    const same = prevG && prevG.round === gs.round && prevG.phase === gs.phase;
+    if (same && gs.phase === 'play' && prevG.locks[s.you] && locks[s.you] === undefined) locks[s.you] = prevG.locks[s.you];
+    G = {
+      mode: 'lobby', remote: true, ladder: gs.ladder, sd: gs.sd, round: gs.round, phase: gs.phase, deadline: Date.now() + gs.remaining, total: gs.total,
+      players, you, locks, revealed: new Set(gs.revealed), lastRev: gs.lastRev,
+      result: gs.result ? { out: new Set(gs.result.out), spared: gs.result.spared, groups: new Map(gs.result.groups.map((ids, i) => [i, ids.map(id => byId[id]).filter(Boolean)])), rejected: new Set(gs.result.rejected || []), votes: gs.result.votes || [] } : null,
+      vote: gs.vote ? { ...gs.vote, ends: Date.now() + gs.vote.left } : null,
+      beaming: gs.beaming ? new Set(gs.beaming) : null, used: new Set(gs.used), usedShow: gs.usedShow, autoLeft: gs.autoLeft,
+      timers: [], dead: false, won: !you.phantom && you.place === 1,
+      msg: same ? prevG.msg : '', msgCls: same ? prevG.msgCls : '', force: same ? prevG.force : null, lastSec: same ? prevG.lastSec : null, checking: same ? prevG.checking : false,
+    };
+    screen = 'game';
+  } else { G = null; screen = 'room'; }
+  clientSounds(prevG);
+  const minor = prevG && G && prevScreen === 'game' && G.phase !== 'vote' && prevG.round === G.round && prevG.phase === G.phase && !!prevG.result === !!G.result && !!prevG.beaming === !!G.beaming;
+  if (minor) { renderSeats(); const el = $('#autoN'); if (el) el.textContent = G.autoLeft; renderSide(); }
+  else render();
+  if (G && G.phase === 'play') startTick();
+}
+function clientSounds(prev) {
+  if (!G) return;
+  if (G.phase === 'play' && (!prev || prev.round !== G.round || prev.phase !== 'play')) { isShowdown() ? SFX.showdown() : SFX.start(); setTimeout(() => { const i = $('#ans'); if (i && !i.disabled && document.activeElement !== $('#cin')) i.focus(); }, 30); }
+  if (prev && prev.round === G.round && G.phase === 'vote' && prev.phase !== 'vote') SFX.pop(2);
+  if (prev && prev.round === G.round && G.phase === 'reveal') {
+    if (G.revealed.size > (prev.revealed ? prev.revealed.size : 0)) SFX.pop(G.revealed.size);
+    if (G.beaming && !prev.beaming) {
+      G.beaming.size ? SFX.jinx() : SFX.clean();
+      if (G.beaming.has(G.you.id)) SFX.out(); else if (G.you.alive && !G.result.spared) SFX.safe();
+    }
+  }
+  if (G.phase === 'end' && prev && prev.phase !== 'end' && G.won) setTimeout(() => SFX.win(), 400);
+}
+
+/* ---------- starting a game ---------- */
+function newGame(mode) {
+  if (G) { G.dead = true; clearTimers(); }
+  let ladder;
+  if (mode === 'daily') ladder = dailyLadder();
+  else {
+    const pref = localStorage.getItem('lws_theme'), lastL = +localStorage.getItem('lws_last');
+    let li;
+    if (pref && pref !== 'random' && LADDERS[+pref]) li = +pref;
+    else do { li = Math.floor(Math.random() * LADDERS.length); } while (li === lastL && LADDERS.length > 1);
+    localStorage.setItem('lws_last', li);
+    ladder = LADDERS[li];
+  }
+  SFX.unlock();
+  let roster = [YOU()];
+  if (mode === 'lobby') {
+    const still = [];
+    ROOM.watchers.forEach(w => { if (ROOM.players.length >= 8) { still.push(w); return; } ROOM.players.push(w); sysSay(`${w.name} is playing this game`); });
+    ROOM.watchers = still;
+    roster = ROOM.players;
+  }
+  const players = roster.map(p => ({ ...p, isYou: p.id === 0, alive: true, outRound: null, place: null, hist: [], left: false }));
+  G = { mode, ladder, round: -1, players, used: new Set(), usedShow: [], sd: shuffle(Object.keys(SHOWDOWN)), timers: [], dead: false, you: players.find(p => p.id === 0), spectate: false };
+  screen = 'game';
+  startRound();
+}
+const isShowdown = () => G.round >= G.ladder.rounds.length;
+const cat = () => isShowdown() ? CATS[G.sd[G.round - G.ladder.rounds.length]] : CATS[G.ladder.rounds[G.round]];
+const alive = () => G.players.filter(p => p.alive);
+const crowdSize = () => CROWD[Math.min(G.round, CROWD.length - 1)];
+const after = (ms, f) => { const g = G; if (!g) return; g.timers.push(setTimeout(() => { if (!g.dead && G === g) f(); }, ms)); };
+const clearTimers = () => { if (G) { G.timers.forEach(clearTimeout); G.timers = []; } };
+const humansAlive = () => alive().some(p => !p.bot);
+
+function startRound() {
+  clearTimers();
+  G.round++;
+  G.phase = 'play'; G.locks = {}; G.revealed = new Set(); G.result = null; G.msg = ''; G.msgCls = ''; G.checking = false;
+  G.lastRev = null; G.lastSec = null; G.crowd = null; G.crowdShown = 0; G.autoLeft = null; G.force = null; G.vote = null;
+  const fast = G.spectate && !humansAlive();   // only computer players left: speed things up
+  const T = (fast ? 3 : isShowdown() ? 9 : TIMES[G.round]) * 1000;
+  G.deadline = Date.now() + T; G.total = T;
+  const c = cat();
+  if (G.mode === 'lobby') {
+    alive().filter(p => p.bot).forEach(b => {
+      if (Math.random() < 0.02 + 0.025 * G.round) return; // froze up
+      const t = fast ? 300 + Math.random() * 1500 : 1500 + Math.random() * (T - 2800);
+      after(t, () => { if (G.phase !== 'play') return; G.locks[b.id] = botPick(b, c, G.used); renderSeats(); checkAllLocked(); });
+    });
+  }
+  after(T + 60, () => G.phase === 'play' && endRound()); // backup in case the tab is in the background
+  if (!fast) isShowdown() ? SFX.showdown() : SFX.start();
+  render();
+  if (G.you.alive) setTimeout(() => { const i = $('#ans'); if (i && document.activeElement !== $('#cin')) i.focus(); }, 30);
+  startTick();
+}
+let ticking = false;
+function startTick() { if (ticking) return; ticking = true; requestAnimationFrame(tick); }
+function tick() {
+  if (!G || G.dead || G.phase !== 'play') { ticking = false; return; }
+  const left = Math.max(0, G.deadline - Date.now());
+  const el = $('#clock'), bar = $('#bar');
+  if (el) { el.textContent = Math.ceil(left / 1000); const bx = $('#clockbox'); if (bx) bx.classList.toggle('hot', left < 4000); }
+  if (bar) { bar.firstElementChild.style.width = (100 * left / G.total) + '%'; bar.classList.toggle('hot', left < 4000); }
+  const sec = Math.ceil(left / 1000);
+  if (sec !== G.lastSec) { G.lastSec = sec; if (sec <= 5 && sec > 0 && G.locks[G.you.id] === undefined && G.you.alive) SFX.tick(sec <= 3); }
+  if (left <= 0) { ticking = false; if (!G.remote) endRound(); return; }
+  requestAnimationFrame(tick);
+}
+function checkAllLocked() {
+  if (alive().every(p => G.locks[p.id] !== undefined)) after(600, () => G.phase === 'play' && endRound());
+}
+
+async function submit(ev) {
+  ev.preventDefault();
+  const me = G.you.id;
+  if (G.phase !== 'play' || G.locks[me] !== undefined || G.checking || !G.you.alive) return;
+  const inp = $('#ans'), text = inp.value.trim();
+  if (!text) return;
+  const c = cat(), g = G;
+  let a = findAnswer(c, text);
+  if (!a) {
+    G.checking = true; setMsg('Checking...', '');
+    const ai = await askAI(c, text);
+    if (G !== g && !(G && G.remote)) return;
+    G.checking = false;
+    if (G.phase !== 'play') return;
+    if (ai) a = ai;
+  }
+  if (!a) {
+    const kk = key(text), real = /[a-z]{2}/i.test(text);
+    if (G.mode === 'lobby' && real && G.force === kk) a = { show: norm(text) || text.toLowerCase(), key: kk, unverified: true };
+    else if (G.mode === 'lobby' && real) {
+      G.force = kk; SFX.nope();
+      setMsg(`"${text}" isn't on our list. Press Enter again or tap "Use it anyway" and everyone will vote on whether it counts.`, 'warn');
+      showForce(true); inp.select(); return;
+    } else { SFX.nope(); setMsg(`"${text}" isn't on the board for ${c.title.toLowerCase()}. Try another!`, 'bad'); inp.select(); return; }
+  }
+  if (G.used.has(a.key)) { SFX.nope(); setMsg(`"${a.show}" was already said in an earlier round. No repeats!`, 'bad'); inp.select(); return; }
+  G.locks[me] = { show: a.show, key: a.key, unverified: !!a.unverified };
+  SFX.lock(); showForce(false);
+  setMsg(a.unverified ? `Locked in: ${a.show}. Everyone will vote on whether it counts.` : `Locked in: ${a.show}. Hope nobody else said it...`, a.unverified ? 'warn' : 'good');
+  inp.disabled = true; $('#lockbtn').disabled = true;
+  if (G.remote) { netSend({ t: 'lock', show: a.show, key: a.key, unverified: !!a.unverified }); renderSeats(); }
+  else { renderSeats(); checkAllLocked(); }
+}
+function showForce(on) { const b = $('#force'); if (b) b.style.display = on ? 'inline-block' : 'none'; }
+function setMsg(t, cls) { G.msg = t; G.msgCls = cls; const m = $('#msg'); if (m) { m.textContent = t; m.className = 'msg ' + cls; } }
+
+async function endRound() {
+  if (G.remote || G.phase !== 'play') return;
+  clearTimers();
+  G.phase = 'reveal';
+  const c = cat(), live = alive(), g = G, fast = G.spectate && !humansAlive();
+  render();
+  if (G.mode !== 'lobby') return endRoundSolo(c, g);
+  for (const p of live) { await sleep(fast ? 120 : 260); if (g.dead) return; G.revealed.add(p.id); G.lastRev = p.id; if (!fast) SFX.pop(G.revealed.size); renderSeats(); }
+  const groups = new Map();
+  live.forEach(p => { const a = G.locks[p.id]; if (a) { if (!groups.has(a.key)) groups.set(a.key, []); groups.get(a.key).push(p); } });
+  // answers the game didn't recognize: everyone else votes on whether they count
+  const rejected = new Set(), votes = [];
+  const toVote = live.filter(p => { const a = G.locks[p.id]; return a && a.unverified && groups.get(a.key).length === 1; });
+  if (toVote.length) {
+    G.phase = 'vote';
+    G.vote = { items: toVote.map(p => ({ pid: p.id, name: p.name, show: G.locks[p.id].show, up: new Set(), down: new Set() })), ends: Date.now() + 10000 };
+    const voters = it => G.players.filter(q => !q.bot && !q.left && q.id !== it.pid);
+    if (!fast) SFX.pop(2);
+    render();
+    while (Date.now() < G.vote.ends) {
+      if (G.vote.items.every(it => voters(it).every(v => it.up.has(v.id) || it.down.has(v.id)))) break;
+      await sleep(400); if (g.dead) return;
+      render();
+    }
+    G.vote.items.forEach(it => { const ok = it.down.size <= it.up.size; votes.push({ pid: it.pid, name: it.name, show: it.show, up: it.up.size, down: it.down.size, ok }); if (!ok) rejected.add(it.pid); });
+    G.vote = null; G.phase = 'reveal'; render();
+    await sleep(300); if (g.dead) return;
+  }
+  const out = new Set();
+  live.forEach(p => {
+    const a = G.locks[p.id];
+    if (!a) { out.add(p.id); p.hist.push({ cat: c.title, ans: null, res: 'time' }); return; }
+    if (rejected.has(p.id)) { out.add(p.id); p.hist.push({ cat: c.title, ans: a.show, res: 'nope' }); return; }
+    const grp = groups.get(a.key);
+    if (grp.length > 1) { out.add(p.id); p.hist.push({ cat: c.title, ans: a.show, res: 'dupe', with: grp.filter(q => q !== p).map(q => q.name) }); }
+    else p.hist.push({ cat: c.title, ans: a.show, res: 'ok' });
+  });
+  live.forEach(p => { const a = G.locks[p.id]; if (a && !G.used.has(a.key)) { G.used.add(a.key); G.usedShow.push(a.show); } });
+  // if every remaining player got matched, nobody is knocked out
+  let spared = false;
+  if (out.size === live.length && live.length > 1 && !rejected.size) {
+    spared = true; out.clear();
+    live.forEach(p => { p.hist[p.hist.length - 1].res = 'spared'; });
+  }
+  G.result = { groups, out, spared, rejected, votes };
+  await sleep(fast ? 200 : 450); if (g.dead) return;
+  G.beaming = out; renderSeats();
+  if (!fast) {
+    if (out.size) SFX.jinx(); else SFX.clean();
+    if (out.has(G.you.id)) SFX.out(); else if (G.you.alive && !spared) SFX.safe();
+  }
+  await sleep(fast ? 400 : 1000); if (g.dead) return;
+  G.beaming = null;
+  const left = live.length - out.size;
+  live.forEach(p => { if (out.has(p.id)) { p.alive = false; p.outRound = G.round; p.place = Math.max(left, 1) + 1; } });
+  roundChat(out, spared);
+  renderSide();
+  const done = left <= 1 || G.round >= G.ladder.rounds.length + SD_MAX - 1;
+  if (done) { alive().forEach(p => p.place = 1); finish(); }
+  else { render(); startAuto(); }
+}
+function roundChat(out, spared) {
+  const bots = () => alive().filter(p => p.bot);
+  if (spared) { if (bots().length) after(900, () => chatSay(pickL(bots()), pickL(['lmaooo everyone', 'we all thought the same thing 💀', 'great minds']))); return; }
+  const jinxed = G.players.filter(p => out.has(p.id));
+  const byAns = new Map();
+  jinxed.forEach(p => { const a = G.locks[p.id], k = a ? a.show : ''; if (!byAns.has(k)) byAns.set(k, []); byAns.get(k).push(p); });
+  byAns.forEach((ps, k) => {
+    const names = listJoin(ps.map(p => p.name)), are = ps.length > 1 ? 'are' : 'is';
+    sysSay(k ? `${names} jinxed on “${k}” and ${are} now watching` : `${names} ran out of time and ${are} now watching`);
+  });
+  jinxed.filter(p => p.bot).forEach(p => { if (Math.random() < .5) after(700 + Math.random() * 1500, () => chatSay(p, pickL(SAD))); });
+  if (jinxed.length && bots().length && Math.random() < .5) after(1300 + Math.random() * 1500, () => chatSay(pickL(bots()), pickL(LAUGH)));
+  if (!jinxed.length && bots().length && Math.random() < .3) after(1000, () => chatSay(pickL(bots()), pickL(CLEAN)));
+}
+
+async function endRoundSolo(c, g) {
+  const you = G.you, a = G.locks[you.id], n = crowdSize();
+  G.crowd = c.answers.filter(x => !G.used.has(x.key)).slice(0, n);
+  G.revealed.add(you.id); G.lastRev = you.id; SFX.pop(1); renderSeats();
+  for (let i = 0; i < G.crowd.length; i++) { await sleep(230); if (g.dead) return; G.crowdShown = i + 1; SFX.pop(i + 2); renderSeats(); }
+  const out = new Set();
+  const rank = a ? G.crowd.findIndex(x => x.key === a.key) : -1;
+  if (!a) { out.add(you.id); you.hist.push({ cat: c.title, ans: null, res: 'time' }); }
+  else if (rank >= 0) { out.add(you.id); you.hist.push({ cat: c.title, ans: a.show, res: 'dupe', with: ['the most common answers'], rank: rank + 1 }); }
+  else you.hist.push({ cat: c.title, ans: a.show, res: 'ok' });
+  [a, ...G.crowd].forEach(x => { if (x && !G.used.has(x.key)) { G.used.add(x.key); G.usedShow.push(x.show); } });
+  G.result = { groups: new Map(), out, spared: false };
+  await sleep(350); if (g.dead) return;
+  G.beaming = out; renderSeats();
+  if (out.size) { SFX.jinx(); SFX.out(); } else SFX.safe();
+  await sleep(out.size ? 900 : 350); if (g.dead) return;
+  G.beaming = null;
+  if (out.size) { you.alive = false; you.outRound = G.round; }
+  if (!you.alive || G.round >= G.ladder.rounds.length - 1) finish();
+  else { render(); startAuto(); }
+}
+
+function startAuto() {
+  G.autoLeft = 5;
+  const step = () => {
+    if (G.phase !== 'reveal') return;
+    const el = $('#autoN'); if (el) el.textContent = G.autoLeft; sync();
+    if (G.autoLeft <= 0) return nextRound();
+    after(1000, () => { G.autoLeft--; step(); });
+  };
+  step();
+}
+function finish() {
+  G.phase = 'end';
+  const you = G.you;
+  if (G.mode === 'lobby') {
+    G.won = you.place === 1;
+    stats.lobbyPlayed++; if (G.won) stats.lobbyWins++;
+    G.players.filter(p => p.bot).forEach(p => { if (Math.random() < .5) after(800 + Math.random() * 2500, () => chatSay(p, pickL(GG))); });
+    const w = G.players.filter(p => p.place === 1);
+    sysSay(w.length === 1 ? `${w[0].name} is unjinxable! 🏆` : `Game over: ${listJoin(w.map(p => p.name))} survived`);
+  } else {
+    G.won = you.alive;
+    const r = you.hist.filter(h => h.res === 'ok').length;
+    if (G.mode === 'solo') { stats.soloPlayed++; stats.soloBest = Math.max(stats.soloBest, r); }
+    else {
+      if (!stats.dailyDays.includes(todayStr())) stats.dailyDays.push(todayStr());
+      LS.set('lws_daily_' + todayStr(), { hist: you.hist, name: G.ladder.name, total: G.ladder.rounds.length, won: G.won });
+    }
+  }
+  saveStats();
+  if (G.won) setTimeout(() => SFX.win(), 400);
+  render(); renderSide();
+}
+function castVote(target, v, voter = myId()) {
+  if (!G || G.phase !== 'vote' || !G.vote) return;
+  const it = G.vote.items.find(i => i.pid === target); if (!it) return;
+  if (G.remote) { it.mine = v; netSend({ t: 'vote', pid: target, v }); render(); return; }
+  const vp = G.players.find(p => p.id === voter);
+  if (!vp || vp.bot || vp.left || voter === target) return;
+  it.up.delete(voter); it.down.delete(voter); (v === 'up' ? it.up : it.down).add(voter);
+  render();
+}
+function nextRound() { if (!G || G.remote || G.phase !== 'reveal') return; if (!G.you.alive) G.spectate = true; startRound(); }
+
+/* ===================== rendering ===================== */
+const AV_BODY = `<circle cx="61" cy="43" r="24.7"/><path d="M11,120 C13,90 34,71.5 61,71.5 C88,71.5 106,90 107.5,120Z"/>`;
+function avatar(bg, fg) { return `<svg viewBox="0 0 120 120"><rect width="120" height="120" fill="${bg}"/><g fill="${fg}">${AV_BODY}</g></svg>`; }
+const LOGO = `un<i>jinx</i>able`;
+
+function topbar() {
+  return `<div class="top"><a class="logo" id="home" href="#">${LOGO}</a>
+    <div class="right"><button class="snd" id="snd" title="Sound on/off">${SFX.on ? '🔊' : '🔇'}</button></div></div>`;
+}
+function themePicker() {
+  const theme = localStorage.getItem('lws_theme') || 'random';
+  return `<div class="themes"><button class="th ${theme === 'random' ? 'on' : ''}" data-th="random">🎲 Surprise me</button>${LADDERS.map((L, i) => `<button class="th ${theme === String(i) ? 'on' : ''}" data-th="${i}">${L.emoji} ${esc(L.name)}</button>`).join('')}</div>`;
+}
+const themeLabel = t => t === 'random' || !LADDERS[+t] ? '🎲 Surprise me' : `${LADDERS[+t].emoji} ${esc(LADDERS[+t].name)}`;
+function homeScreen() {
+  const ds = dailySaved(), streak = dailyStreak();
+  const dailyStatus = ds ? `Done today ✓ ${ds.hist.filter(h => h.res === 'ok').length}/${ds.total}${streak ? ` · 🔥 ${streak} day streak` : ''}` : (streak ? `🔥 ${streak} day streak` : 'New puzzle every day');
+  const notice = NET.notice ? `<div class="notice">${esc(NET.notice)}</div>` : '';
+  NET.notice = '';
+  return `${topbar()}${notice}
+    <div class="hero"><h1>${LOGO}</h1>
+    <p class="lead">The word game where saying the same thing as anyone else gets you jinxed.</p></div>
+    <div class="modes">
+      <button class="mode lobby" id="mLobby"><div class="mi">🎙️</div><div class="mt">Play with others</div>
+        <div class="md">Make a room, send friends the code, and outlast everyone. Match anyone's answer and you're both jinxed.</div>
+        <div class="ms">${stats.lobbyPlayed ? `${stats.lobbyWins} win${stats.lobbyWins === 1 ? '' : 's'} in ${stats.lobbyPlayed} game${stats.lobbyPlayed === 1 ? '' : 's'}` : 'Up to 8 players'}</div></button>
+      <button class="mode solo" id="mSolo"><div class="mi">🎯</div><div class="mt">Solo</div>
+        <div class="md">Just you. The most common answers are off-limits, so don't be basic.</div>
+        <div class="ms">${stats.soloPlayed ? `Best: ${stats.soloBest}/6 rounds` : '6 rounds · any theme'}</div></button>
+      <button class="mode daily" id="mDaily"><div class="mi">📅</div><div class="mt">Daily #${dayNumber()}</div>
+        <div class="md">Same 6 categories for everyone today. One try. Share your result.</div>
+        <div class="ms">${dailyStatus}</div></button>
+    </div>
+    <details class="how"><summary>How to play</summary><ol class="steps">
+      <li><b>A category appears</b> and the clock starts. Type one answer and lock it in.</li>
+      <li><b>Say the same thing as anyone else and you're jinxed.</b> Be original, but it has to be a real answer. Answers can't repeat across rounds.</li>
+      <li><b>With others:</b> the last player who never gets jinxed is unjinxable. <b>Solo &amp; Daily:</b> the 3 most common answers are off-limits in round 1, then the top 4, 5… Don't be basic for all 6 rounds.</li>
+    </ol></details>`;
+}
+function onlineScreen() {
+  const busy = NET.joining;
+  return `${topbar()}<div class="panel"><div class="pick">Play with others</div>
+    <label class="lbl" for="nameIn">Your name</label>
+    <input id="nameIn" class="field" maxlength="16" value="${esc(LS.get('unj_name', ''))}" placeholder="What should people call you?">
+    <div class="two">
+      <div class="box"><h3>Create a room</h3><p class="muted">You'll get a 4-letter code to send your friends.</p><button class="btn" id="create" ${busy ? 'disabled' : ''}>Create room</button></div>
+      <div class="box"><h3>Join a room</h3><p class="muted">Got a code from a friend?</p>
+        <div class="row"><input id="codeIn" class="field codein" maxlength="4" placeholder="CODE" autocomplete="off" ${busy ? 'disabled' : ''}><button class="btn" id="join" ${busy ? 'disabled' : ''}>${busy ? 'Joining…' : 'Join'}</button></div></div>
+    </div>
+    <div class="msg bad">${esc(NET.error || '')}</div>
+    <p class="note">Rooms connect your browsers directly through a free matchmaking service (PeerJS), so you need an internet connection. The person who creates the room keeps it running, so they should keep their tab open.</p>
+    <div class="row" style="margin-top:12px"><button class="btn ghost" id="back">Back</button></div></div>`;
+}
+function soloSetup() {
+  return `${topbar()}<div class="panel"><div class="pick">Solo · don't be basic</div>
+    <h2 class="h2">Pick a theme</h2>${themePicker()}
+    <p class="muted" style="margin:0 0 16px">Each round, the most common answers are off-limits: the top 3 in round 1, then the top 4, 5, 6… Say one of them and it's too basic. Survive all 6 rounds to win.</p>
+    <div class="row"><button class="btn" id="startSolo">Start</button><button class="btn ghost" id="back">Back</button></div></div>`;
+}
+function roomScreen() {
+  const host = isHost(), ps = ROOM.players, empty = Math.max(0, 8 - ps.length), me = myId();
+  const st = host ? (NET.status === 'online' ? `<span class="netstat on">● Open: friends can join with this code</span>`
+    : NET.status === 'connecting' ? `<span class="netstat">● Opening room…</span>`
+    : `<span class="netstat off">● Offline: friends can't join right now (check your internet). You can still play with computer players.</span>`) : `<span class="netstat on">● Connected</span>`;
+  const tag = p => p.id === me ? '<small>you</small>' : p.host ? '<small>host</small>' : p.bot ? '<small>computer</small>' : '';
+  return `${topbar()}<div class="panel">
+    <div class="roomhead"><div><div class="pick">Room code</div><div class="code">${ROOM.code}</div>${st}</div><button class="btn ghost" id="leave">Leave room</button></div>
+    ${host ? `<p class="invite">Tell friends: open Unjinxable → <b>Play with others</b> → <b>Join a room</b> → type <b>${ROOM.code}</b></p>` : ''}
+    <div class="pick">Players · ${ps.length}/8</div>
+    <div class="roster">${ps.map(p => `<div>${avatar(p.c, p.d)}${esc(p.name)}${tag(p)}</div>`).join('')}${'<div><span class="empty"></span>&nbsp;</div>'.repeat(empty)}</div>
+    ${ROOM.watchers.length ? `<p class="note" style="margin:-8px 0 14px">👀 Watching: ${esc(ROOM.watchers.map(w => w.name).join(', '))}</p>` : ''}
+    ${host ? `<div class="row" style="margin:-4px 0 16px"><button class="btn ghost sm" id="addBot" ${ps.length >= 8 || !BOTS.some(b => !ps.some(p => p.name === b.name)) ? 'disabled' : ''}>＋ Add computer player</button><button class="btn ghost sm" id="rmBot" ${ps.some(p => p.bot) ? '' : 'disabled'}>Remove one</button></div>` : ''}
+    <div class="pick">Theme</div>${host ? themePicker() : `<p class="themename">${themeLabel(ROOM.theme)}</p>`}
+    ${host ? `<div class="row"><button class="btn" id="startLobby" ${ps.length < 2 ? 'disabled' : ''}>Start game</button><span class="muted">${ps.length < 2 ? 'Waiting for at least one more player…' : ps.length < 8 ? 'Start whenever everyone is in' : 'Room is full!'}</span></div>`
+      : `<p class="muted" style="font-weight:700">Waiting for the host to start the game…</p>`}
+  </div>`;
+}
+function dailyDone() {
+  const ds = dailySaved();
+  const squares = ds.hist.map(h => h.res === 'ok' ? '🟩' : '🟥').join('') + '⬜'.repeat(Math.max(0, ds.total - ds.hist.length));
+  const r = ds.hist.filter(h => h.res === 'ok').length;
+  const share = `Unjinxable 📅 ${ds.name}\n${squares}  ${r}/${ds.total}${ds.won ? ' 🏆' : ''}`;
+  G = null; window.__share = share;
+  const now = new Date(), mid = new Date(now); mid.setHours(24, 0, 0, 0);
+  const mins = Math.ceil((mid - now) / 60000);
+  return `${topbar()}<div class="panel"><div class="pick">${esc(ds.name)}</div>
+    <p class="big">${ds.won ? 'Never basic! 🏆' : `${r} of ${ds.total} rounds`}</p>
+    <p class="muted" style="margin:0">You've played today's daily. Next one in ${Math.floor(mins / 60)}h ${mins % 60}m.${dailyStreak() ? ` 🔥 ${dailyStreak()} day streak.` : ''}</p>
+    <div class="recap">${recapHTML(ds.hist)}</div><div class="share">${esc(share)}</div>
+    <div class="row"><button class="btn ghost" id="copy">Copy result</button><button class="btn" id="back">Home</button></div></div>`;
+}
+function recapHTML(hist) {
+  return hist.map((h, i) => `<div><span class="muted">${i + 1}. ${esc(h.cat)}</span><b>${h.ans ? esc(h.ans) : '—'} ${h.res === 'ok' ? '✅' : h.res === 'spared' ? '😮‍💨' : h.res === 'time' ? '⏱️' : h.res === 'nope' ? '🚫' : h.rank ? '🙄' : '💥'}</b></div>`).join('');
+}
+
+function seatHTML(p) {
+  const a = G.locks ? G.locks[p.id] : undefined;
+  const R = G.result;
+  const jinxNow = G.phase !== 'play' && R && R.out.has(p.id) && (G.beaming || p.outRound === G.round);
+  const goneEarlier = !p.alive && p.outRound !== G.round;
+  let chip, cls = 'wait';
+  if (goneEarlier) { chip = p.left ? 'left' : `out · round ${p.outRound + 1}`; }
+  else if (G.phase === 'play') {
+    if (a !== undefined) { chip = p.isYou ? '🔒 ' + esc(a.show) : 'locked in 🔒'; cls = 'lock'; }
+    else chip = p.isYou ? 'your turn…' : '<span class="typing">• • •</span>';
+  } else if (G.revealed && G.revealed.has(p.id)) {
+    chip = a ? esc(a.show) + (a.unverified && !(R && R.votes && R.votes.some(v => v.pid === p.id && v.ok)) ? ' ❓' : '') : 'no answer'; cls = a ? (p.id === G.lastRev && !R ? 'flip' : '') : 'dead';
+    if (jinxNow) cls = 'dead';
+    else if (R && R.spared) cls = 'spared';
+  } else { chip = '🔒'; cls = 'lock'; }
+  const grey = goneEarlier || jinxNow;
+  const shake = G.beaming && G.beaming.has(p.id);
+  const stamp = jinxNow ? `<div class="stamp">${!a ? 'TOO SLOW' : R.rejected && R.rejected.has(p.id) ? 'NOPE!' : G.mode === 'lobby' ? 'JINX!' : 'TOO BASIC!'}</div>` : '';
+  return `<div class="p ${p.isYou ? 'you' : ''} ${goneEarlier ? 'gone' : ''} ${shake ? 'shake' : ''}" style="--c:${p.d}">
+    ${grey ? avatar('#e6e6e6', '#cfcfcf') : avatar(p.c, p.d)}${stamp}
+    <div class="nm">${esc(p.name)}</div><div class="chip ${cls}">${chip}</div></div>`;
+}
+function soloHTML() {
+  const n = crowdSize(), shown = G.crowdShown || 0, mine = G.locks ? G.locks[G.you.id] : null;
+  const slots = Array.from({ length: n }, (_, i) => {
+    const x = G.crowd && i < shown ? G.crowd[i] : null, hit = x && mine && x.key === mine.key;
+    return `<div class="slot ${x ? 'open' : ''} ${hit ? 'hit' : ''}"><span>${i + 1}</span>${x ? esc(x.show) : '?'}</div>`;
+  }).join('');
+  return `${seatHTML(G.you)}<div class="crowd"><div class="ch">🙄 The ${n} most common answers${G.phase === 'play' ? ' · revealed after you answer' : ''}</div><div class="slots">${slots}</div></div>`;
+}
+function seatsInner() { return G.mode === 'lobby' ? G.players.map(seatHTML).join('') : soloHTML(); }
+function renderSeats() { const t = $('#grid'); if (t && G) t.innerHTML = seatsInner(); sync(); }
+
+function boardHTML() {
+  const c = cat(), left = Math.max(0, G.deadline - Date.now()), playing = G.phase === 'play';
+  const label = isShowdown() ? '⚡ FINAL SHOWDOWN' : `ROUND ${G.round + 1} OF ${G.ladder.rounds.length} · ${G.ladder.emoji} ${esc(G.ladder.name.toUpperCase())}`;
+  const extra = G.mode === 'lobby' ? `${alive().length} LEFT` : `TOP ${crowdSize()} MOST COMMON ARE OFF-LIMITS`;
+  return `<div class="board"><div class="cat"><div class="k">${label} · ${extra}</div><div class="v">${esc(c.title)}</div></div>
+    <div class="time ${playing ? '' : G.phase === 'vote' ? 'hot' : 'done'}" id="clockbox"><div><b id="clock">${playing ? Math.ceil(left / 1000) : G.phase === 'vote' && G.vote ? Math.max(0, Math.ceil((G.vote.ends - Date.now()) / 1000)) : 0}</b><span>${G.phase === 'vote' ? 'TO VOTE' : 'SECONDS'}</span></div></div></div>
+    <div class="bar" id="bar"><i style="width:${playing ? 100 * left / G.total : 0}%"></i></div>`;
+}
+function usedHTML() {
+  return G.usedShow.length ? `<div class="used">Already said, no repeats: ${G.usedShow.map(u => `<span>${esc(u)}</span>`).join('')}</div>` : '';
+}
+function autoHTML() { return `<span class="auto">Next round in <b id="autoN">${G.autoLeft ?? 5}</b>…</span>`; }
+function leaveBtn() { return isHost() ? '' : '<button class="btn ghost" id="leave">Leave room</button>'; }
+function bottom() {
+  if (G.phase === 'play') {
+    if (!G.you.alive) {
+      const why = G.you.phantom ? "You joined mid-game, so you're watching until the next one." : "You got jinxed, so you're watching until the next game.";
+      return `<div class="banner ink"><div class="h">You're watching 👀</div><div class="lines"><div>${why}</div></div>${usedHTML()}${leaveBtn() ? `<div class="row" style="margin-top:10px">${leaveBtn()}</div>` : ''}</div>`;
+    }
+    const locked = G.locks[G.you.id] !== undefined;
+    return `<div class="ask"><form id="f" autocomplete="off"><input id="ans" maxlength="40" placeholder="Type your answer, press Enter" ${locked ? 'disabled' : ''}>
+      <button class="btn" id="lockbtn" ${locked ? 'disabled' : ''}>Lock in</button></form>
+      <div class="row"><div class="msg ${G.msgCls}" id="msg">${esc(G.msg)}</div><button type="button" class="btn ghost sm" id="force" style="display:${G.force && !locked ? 'inline-block' : 'none'}">Use it anyway</button></div>${usedHTML()}</div>`;
+  }
+  if (G.phase === 'vote' && G.vote) {
+    const secs = Math.max(0, Math.ceil((G.vote.ends - Date.now()) / 1000));
+    const me = G.players.find(p => p.id === G.you.id);
+    const rows = G.vote.items.map(it => {
+      const mine = it.mine !== undefined ? it.mine : it.up.has(G.you.id) ? 'up' : it.down.has(G.you.id) ? 'down' : null;
+      const n = k => typeof it[k] === 'number' ? it[k] : it[k].size;
+      const canVote = me && !me.left && it.pid !== G.you.id;
+      return `<div class="vrow"><div><b>“${esc(it.show)}”</b> <span class="muted">from ${esc(it.name)}${it.pid === G.you.id ? ' (you)' : ''}</span></div>
+        ${canVote ? `<div class="row"><button class="vbtn ${mine === 'up' ? 'on' : ''}" data-vote="${it.pid}" data-v="up">👍 Counts · ${n('up')}</button><button class="vbtn no ${mine === 'down' ? 'on' : ''}" data-vote="${it.pid}" data-v="down">👎 Doesn't count · ${n('down')}</button></div>`
+          : `<span class="muted" style="font-weight:700">👍 ${n('up')} · 👎 ${n('down')} · everyone's voting…</span>`}</div>`;
+    }).join('');
+    return `<div class="banner"><div class="h">Does it count? 🤔</div><div style="font-weight:600;margin-top:2px">The game didn't recognize ${G.vote.items.length > 1 ? 'these answers' : 'this answer'}. More 👎 than 👍 and it's out. ${secs}s left.</div><div class="votes">${rows}</div></div>`;
+  }
+  if (G.phase === 'reveal') {
+    if (!G.result || G.beaming) return '';
+    const R = G.result, you = G.you, h = you.hist[you.hist.length - 1];
+    if (G.mode !== 'lobby') {
+      return `<div class="banner lime"><div class="h">You survived!</div><div style="font-weight:600;margin-top:2px">“${esc(h.ans)}” wasn't one of the ${crowdSize()} most common answers. Next round, the top ${CROWD[Math.min(G.round + 1, CROWD.length - 1)]} are off-limits.</div>
+        <div class="row" style="margin-top:12px"><button class="btn" id="next">Next now →</button>${autoHTML()}</div></div>`;
+    }
+    const lines = [];
+    (R.votes || []).forEach(v => lines.push(v.ok ? `<div><b>“${esc(v.show)}”</b> from ${esc(v.name)} counts (👍 ${v.up} · 👎 ${v.down}).</div>` : `<div><b>“${esc(v.show)}”</b> from ${esc(v.name)} didn't count (👎 ${v.down} · 👍 ${v.up}). Out!</div>`));
+    if (!R.spared) {
+      R.groups.forEach(grp => { if (grp.length > 1 && G.locks[grp[0].id]) lines.push(`<div><b>${esc(G.locks[grp[0].id].show)}</b>: ${esc(listJoin(grp.map(p => p.name)))}. Jinx!</div>`); });
+      G.players.filter(p => p.outRound === G.round && !G.locks[p.id] && !p.left).forEach(p => lines.push(`<div><b>${esc(p.name)}</b> ran out of time.</div>`));
+    }
+    if (!R.out.size && !R.spared) lines.push(`<div>Every answer was different. Nobody's out!</div>`);
+    let color, head, sub = '';
+    if (R.spared && you.alive) { color = 'lime'; head = 'Spared! 😮‍💨'; sub = 'You matched someone, but so did everyone else. Nobody is out.'; }
+    else if (you.outRound === G.round && h && h.res === 'nope') { color = 'red'; head = 'Nope! 🚫'; sub = `Most people said “${esc(h.ans)}” doesn't count. You'll watch the rest of this game.`; }
+    else if (you.outRound === G.round && h) { color = 'red'; head = h.res === 'time' ? 'Too slow!' : 'JINX!'; sub = h.res === 'time' ? "You ran out of time. You'll watch the rest of this game." : `${esc(listJoin(h.with))} also said “${esc(h.ans)}.” You'll watch the rest of this game.`; }
+    else if (you.alive && h) { color = 'lime'; head = 'You survived!'; sub = `“${esc(h.ans)}” was all yours.`; }
+    else { color = ''; head = `${alive().length} still standing`; }
+    if (G.round + 1 === G.ladder.rounds.length) lines.push(`<div><b>⚡ ${alive().length} made it through all ${G.ladder.rounds.length} rounds. Final showdown!</b> Tiny categories until one player is left.</div>`);
+    const btns = `${autoHTML()}${you.alive ? '' : leaveBtn()}`;
+    return `<div class="banner ${color}"><div class="h">${head}</div>${sub ? `<div style="font-weight:600;margin-top:2px">${sub}</div>` : ''}
+      <div class="lines">${lines.join('')}</div><div class="row">${btns}</div></div>`;
+  }
+  return endPanel();
+}
+function ordinal(n) { return n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th'); }
+function endPanel() {
+  const you = G.you;
+  let head, sub, share = '', btns;
+  if (G.mode === 'lobby') {
+    const winners = G.players.filter(p => p.place === 1), n = G.players.length;
+    if (you.phantom) { head = 'Game over'; sub = winners.length === 1 ? `${esc(winners[0].name)} was unjinxable. You'll play in the next game.` : `Survivors: ${esc(listJoin(winners.map(w => w.name)))}.`; }
+    else if (G.won && winners.length === 1) { head = 'Unjinxable! 🏆'; sub = `You outlasted all ${n - 1} players.`; }
+    else if (G.won) { head = 'You survived!'; sub = `You made it to the very end, along with ${esc(listJoin(winners.filter(w => !w.isYou).map(w => w.name)))}.`; }
+    else { head = `You placed ${ordinal(you.place)} of ${n}`; sub = winners.length === 1 ? `${esc(winners[0].name)} was unjinxable.` : `Survivors: ${esc(listJoin(winners.map(w => w.name)))}.`; }
+    if (!you.phantom) {
+      const sq = you.hist.map(h => h.res === 'ok' ? '🟩' : h.res === 'spared' ? '🟨' : '🟥').join('');
+      share = `Unjinxable ${G.ladder.emoji} ${G.ladder.name}\n${sq}  ${G.won ? (winners.length === 1 ? '🏆 unjinxable' : 'survived') : ordinal(you.place) + ' of ' + n}`;
+    }
+    btns = isHost() ? `<button class="btn" id="again">Play again</button><button class="btn ghost" id="toRoom">Back to room</button>`
+      : `<span class="muted" style="font-weight:700">Waiting for the host…</span>${leaveBtn()}`;
+  } else {
+    const r = you.hist.filter(h => h.res === 'ok').length, total = G.ladder.rounds.length, last = you.hist[you.hist.length - 1];
+    if (G.won) { head = 'Never basic! 🏆'; sub = `You dodged every common answer for all ${total} rounds.`; }
+    else { head = last.res === 'time' ? 'Too slow! ⏱️' : 'Too basic! 🙄'; sub = `You survived ${r} of ${total} rounds.${last.rank ? ` “${esc(last.ans)}” was the #${last.rank} most common answer.` : ''}`; }
+    const sq = you.hist.map(h => h.res === 'ok' ? '🟩' : '🟥').join('') + '⬜'.repeat(Math.max(0, total - you.hist.length));
+    share = `Unjinxable ${G.ladder.emoji} ${G.ladder.name}\n${sq}  ${r}/${total}${G.won ? ' 🏆' : ''}`;
+    btns = G.mode === 'daily' ? `<button class="btn" id="back">Home</button>` : `<button class="btn" id="againSolo">Play again</button><button class="btn ghost" id="back">Home</button>`;
+  }
+  window.__share = share;
+  return `<div class="panel" style="margin-top:12px"><p class="big">${head}</p><p class="muted" style="font-weight:600;margin:0">${sub}</p>
+    ${you.hist.length ? `<div class="recap">${recapHTML(you.hist)}</div>` : ''}${share ? `<div class="share">${esc(share)}</div>` : ''}
+    <div class="row">${btns}${share ? '<button class="btn ghost" id="copy">Copy result</button>' : ''}</div></div>`;
+}
+function gameScreen() {
+  return `${topbar()}${boardHTML()}${bottom()}<div class="${G.mode === 'lobby' ? 'grid' : 'solowrap'}" id="grid">${seatsInner()}</div>`;
+}
+
+/* ---------- side chat panel ---------- */
+function chatVisible() { return !!ROOM && (screen === 'room' || (screen === 'game' && G && G.mode === 'lobby')); }
+function renderSide() {
+  const vis = chatVisible();
+  document.body.classList.toggle('chat-on', vis);
+  const side = $('#side');
+  if (!vis) { side.innerHTML = ''; return; }
+  if (!$('#feed')) {
+    side.innerHTML = `<div class="chat"><div class="chead"><b>Room chat</b><span id="ccount"></span></div><div class="watch" id="watch"></div>
+      <div class="feed" id="feed"></div><form id="cform" autocomplete="off"><input id="cin" maxlength="140" placeholder="Say something…"><button>Send</button></form></div>`;
+    $('#cform').onsubmit = e => { e.preventDefault(); const i = $('#cin'), t = i.value.trim(); if (!t || !ROOM) return; i.value = ''; sendChat(t); };
+  }
+  let playing, watching = [];
+  if (screen === 'game' && G) {
+    playing = alive().length;
+    G.players.filter(p => !p.alive && !p.left).forEach(p => watching.push(`${p.name} · jinxed`));
+  } else playing = ROOM.players.length;
+  ROOM.watchers.forEach(w => watching.push(`${w.name} · waiting for next game`));
+  $('#ccount').textContent = screen === 'game' ? `${playing} playing · ${watching.length} watching` : `${playing} in room`;
+  $('#watch').innerHTML = watching.length ? `👀 ${watching.map(w => `<span>${esc(w)}</span>`).join('')}` : '';
+  renderFeed();
+}
+function renderFeed() {
+  const f = $('#feed'); if (!f || !ROOM) { sync(); return; }
+  const atBottom = f.scrollHeight - f.scrollTop - f.clientHeight < 40;
+  const me = myId();
+  f.innerHTML = ROOM.chat.map(m => m.kind === 'sys' ? `<div class="m sys">${esc(m.text)}</div>`
+    : `<div class="m ${m.pid === me ? 'mine' : ''}"><b style="color:${m.c}">${esc(m.name)}</b> ${esc(m.text)}</div>`).join('');
+  if (atBottom || ROOM.chat.length < 12) f.scrollTop = f.scrollHeight;
+  sync();
+}
+
+function render() {
+  const a0 = $('#ans'), typed = a0 ? a0.value : '', hadFocus = a0 && document.activeElement === a0;
+  const views = { home: homeScreen, solo: soloSetup, online: onlineScreen, room: roomScreen, daily: dailyDone, game: gameScreen };
+  $('#app').innerHTML = views[screen]();
+  const a1 = $('#ans');
+  if (a1 && typed && G && G.phase === 'play' && !a1.disabled) a1.value = typed;
+  if (a1 && hadFocus && !a1.disabled) { a1.focus(); a1.setSelectionRange(a1.value.length, a1.value.length); }
+  const on = (id, f) => { const e = $(id); if (e) e.onclick = f; };
+  on('#home', e => { e.preventDefault(); goHome(); });
+  on('#snd', () => { SFX.toggle(); $('#snd').textContent = SFX.on ? '🔊' : '🔇'; const i = $('#ans'); if (i && !i.disabled) i.focus(); });
+  document.querySelectorAll('[data-th]').forEach(b => b.onclick = () => { localStorage.setItem('lws_theme', b.dataset.th); render(); sync(); });
+  on('#mLobby', () => { NET.error = ''; screen = 'online'; render(); });
+  on('#mSolo', () => { screen = 'solo'; render(); });
+  on('#mDaily', () => { if (dailySaved()) { screen = 'daily'; render(); } else newGame('daily'); });
+  on('#create', createRoom);
+  on('#join', joinRoom);
+  const ci = $('#codeIn'); if (ci) ci.onkeydown = e => { if (e.key === 'Enter') joinRoom(); };
+  on('#startSolo', () => newGame('solo'));
+  on('#againSolo', () => newGame('solo'));
+  on('#back', goHome);
+  on('#leave', goHome);
+  on('#addBot', addBot); on('#rmBot', removeBot);
+  on('#startLobby', () => newGame('lobby'));
+  on('#again', () => newGame('lobby'));
+  on('#toRoom', () => { if (G) { G.dead = true; clearTimers(); } G = null; screen = 'room'; render(); });
+  on('#next', nextRound);
+  on('#force', () => { const f = $('#f'); if (f) f.requestSubmit(); });
+  document.querySelectorAll('[data-vote]').forEach(b => b.onclick = () => castVote(+b.dataset.vote, b.dataset.v));
+  on('#copy', () => {
+    const done = () => { $('#copy').textContent = 'Copied!'; };
+    if (navigator.clipboard) navigator.clipboard.writeText(window.__share).then(done, () => fallbackCopy(done)); else fallbackCopy(done);
+  });
+  const f = $('#f'); if (f) f.onsubmit = submit;
+  renderSide();
+  sync();
+}
+function fallbackCopy(done) { const t = document.createElement('textarea'); t.value = window.__share; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); done(); } catch {} t.remove(); }
+document.addEventListener('keydown', e => {
+  if (e.target && e.target.id === 'cin') return;
+  if (e.key === 'Enter' && G && G.mode !== 'lobby' && screen === 'game' && G.phase === 'reveal' && G.result && !G.beaming && $('#next')) { e.preventDefault(); nextRound(); }
+});
+render();
+</script>
+</body>
+</html>
